@@ -1,17 +1,27 @@
 package com.zerodev.smsforwarder.ui.screen.history
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.zerodev.smsforwarder.domain.model.ForwardingHistory
 import com.zerodev.smsforwarder.domain.model.StatusColor
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * Screen for viewing SMS forwarding history.
@@ -22,6 +32,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var selectedHistoryEntry by remember { mutableStateOf<ForwardingHistory?>(null) }
     
     Scaffold(
         topBar = {
@@ -102,11 +113,22 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(uiState.history) { historyEntry ->
-                        HistoryItem(historyEntry = historyEntry)
+                        HistoryItem(
+                            historyEntry = historyEntry,
+                            onClick = { selectedHistoryEntry = historyEntry }
+                        )
                     }
                 }
             }
         }
+    }
+    
+    // Show detailed dialog when history entry is selected
+    selectedHistoryEntry?.let { historyEntry ->
+        HistoryDetailDialog(
+            historyEntry = historyEntry,
+            onDismiss = { selectedHistoryEntry = null }
+        )
     }
 }
 
@@ -133,10 +155,13 @@ private fun StatisticItem(
 
 @Composable
 private fun HistoryItem(
-    historyEntry: ForwardingHistory
+    historyEntry: ForwardingHistory,
+    onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
@@ -243,6 +268,204 @@ private fun StatusChip(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall
         )
+    }
+}
+
+@Composable
+private fun HistoryDetailDialog(
+    historyEntry: ForwardingHistory,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "SMS Details",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close"
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Status
+                DetailSection(title = "Status") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        StatusChip(historyEntry = historyEntry)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (historyEntry.matchedRule) {
+                            Text(
+                                text = "✓ Rule matched",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(
+                                text = "✗ No rule matched",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                
+                // SMS Information
+                DetailSection(title = "SMS Information") {
+                    DetailRow("From", historyEntry.smsMessage.sender)
+                    DetailRow("Content", historyEntry.smsMessage.body)
+                    DetailRow(
+                        "Received", 
+                        historyEntry.smsMessage.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString()
+                    )
+                }
+                
+                // Rule Information
+                if (historyEntry.matchedRule) {
+                    DetailSection(title = "Rule Information") {
+                        DetailRow("Rule Name", historyEntry.ruleName)
+                        if (historyEntry.ruleId != null) {
+                            DetailRow("Rule ID", historyEntry.ruleId.toString())
+                        }
+                    }
+                    
+                    // Request Information
+                    if (historyEntry.requestPayload != null) {
+                        DetailSection(title = "Request Information") {
+                            DetailRow("Payload", historyEntry.requestPayload, isCode = true)
+                        }
+                    }
+                    
+                    // Response Information
+                    if (historyEntry.responseCode != null || historyEntry.responseBody != null) {
+                        DetailSection(title = "Response Information") {
+                            historyEntry.responseCode?.let { code ->
+                                DetailRow("Response Code", code.toString())
+                                DetailRow("HTTP Status", historyEntry.getHttpStatusDescription() ?: "Unknown")
+                            }
+                            historyEntry.responseBody?.let { body ->
+                                DetailRow("Response Body", body, isCode = true)
+                            }
+                        }
+                    }
+                } else {
+                    // No Rule Matched Information
+                    DetailSection(title = "Processing Information") {
+                        DetailRow("Reason", historyEntry.errorMessage ?: "No matching rules found")
+                    }
+                }
+                
+                // Error Information
+                if (historyEntry.errorMessage != null && historyEntry.matchedRule) {
+                    DetailSection(title = "Error Information") {
+                        DetailRow("Error Message", historyEntry.errorMessage)
+                    }
+                }
+                
+                // Timestamps
+                DetailSection(title = "Timestamps") {
+                    DetailRow(
+                        "Processed At", 
+                        historyEntry.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).toString()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailSection(
+    title: String,
+    content: @Composable () -> Unit
+) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        content()
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun DetailRow(
+    label: String,
+    value: String,
+    isCode: Boolean = false
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        if (isCode) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    ),
+                    modifier = Modifier.padding(12.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
