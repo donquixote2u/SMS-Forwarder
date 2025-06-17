@@ -1,6 +1,7 @@
 package com.zerodev.smsforwarder.ui.screen.settings
 
 import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -25,11 +26,18 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun SettingsScreen() {
+    val permissionsToRequest = mutableListOf(
+        Manifest.permission.RECEIVE_SMS,
+        Manifest.permission.READ_SMS
+    ).apply {
+        // Only request POST_NOTIFICATIONS on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    
     val permissionsState = rememberMultiplePermissionsState(
-        permissions = listOf(
-            Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_SMS
-        )
+        permissions = permissionsToRequest
     )
     
     Scaffold(
@@ -64,9 +72,27 @@ fun SettingsScreen() {
                         title = "SMS Permissions",
                         description = "Required to receive and read SMS messages",
                         icon = Icons.Default.Phone,
-                        isGranted = permissionsState.permissions.all { it.status.isGranted },
+                        isGranted = permissionsState.permissions.filter { 
+                            it.permission == Manifest.permission.RECEIVE_SMS || 
+                            it.permission == Manifest.permission.READ_SMS 
+                        }.all { it.status.isGranted },
                         onRequest = { permissionsState.launchMultiplePermissionRequest() }
                     )
+                    
+                    // Only show notification permission on Android 13+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        PermissionItem(
+                            title = "Notification Permission",
+                            description = "Required for foreground service notifications (Android 13+)",
+                            icon = Icons.Default.Star,
+                            isGranted = permissionsState.permissions.find { 
+                                it.permission == Manifest.permission.POST_NOTIFICATIONS 
+                            }?.status?.isGranted ?: false,
+                            onRequest = { permissionsState.launchMultiplePermissionRequest() }
+                        )
+                    }
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
