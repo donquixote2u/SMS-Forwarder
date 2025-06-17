@@ -11,6 +11,7 @@ A minimal-UI Android app that runs as a background SMS listener and forwards mat
 📈 **History Tracking** - Paginated logs of all forwarding attempts  
 🔄 **Auto-Start** - Automatically starts monitoring on device boot  
 ⚡ **Battery Optimized** - Uses foreground service with minimal notifications  
+🔍 **Debug Mode**: Track ALL received SMS messages for troubleshooting  
 
 ## Architecture
 
@@ -155,4 +156,140 @@ Enables reliable background processing of SMS messages even when the app is not 
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details. 
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## CI/CD Workflows
+
+This project includes comprehensive GitHub Actions workflows:
+
+### 🔨 Build and Release Workflow
+**File**: `.github/workflows/build-and-release.yml`
+
+**Triggers**:
+- Push to `master`, `main`, or `develop` branches
+- Pull requests to `master` or `main`
+- Manual workflow dispatch
+- Tag pushes (creates releases)
+
+**Features**:
+- ✅ Builds both debug and release APKs
+- 🧪 Runs unit tests and lint checks
+- 🔒 Security vulnerability scanning
+- 📦 Creates GitHub releases with APK attachments
+- 📋 Generates detailed release notes
+- 🏷️ Automatic version tagging
+
+### 🔍 PR Check Workflow
+**File**: `.github/workflows/pr-check.yml`
+
+**Triggers**:
+- Pull requests to `master` or `main`
+
+**Features**:
+- 🏗️ Quick build validation
+- 🧪 Runs tests and lint
+- 💬 Comments on PR with build status
+- ⚡ Fast feedback for contributors
+
+### Creating a Release
+
+#### Automatic Release (Recommended)
+1. Push a git tag:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+2. GitHub Actions will automatically:
+   - Build the APKs
+   - Create a GitHub release
+   - Attach APK files
+   - Generate release notes
+
+#### Manual Release
+1. Go to the Actions tab in GitHub
+2. Select "Build and Release" workflow
+3. Click "Run workflow"
+4. Check "Create a new release"
+5. Click "Run workflow"
+
+### Workflow Outputs
+
+Each workflow produces:
+- **Debug APK**: For development and testing
+- **Release APK**: Optimized for production (unsigned)
+- **Build Info**: Commit SHA, build date, and metadata
+- **Lint Reports**: Code quality analysis
+- **Security Reports**: Dependency vulnerability scan
+
+## Development
+
+### Prerequisites
+- Android Studio Arctic Fox or later
+- JDK 17
+- Android SDK 34
+- Kotlin 1.9+
+
+### Project Structure
+```
+app/
+├── src/main/java/com/zerodev/smsforwarder/
+│   ├── data/           # Data layer (repositories, DAOs, entities)
+│   ├── domain/         # Domain layer (models, use cases)
+│   ├── ui/             # UI layer (screens, viewmodels, navigation)
+│   └── di/             # Dependency injection modules
+├── src/test/           # Unit tests
+└── src/androidTest/    # Instrumentation tests
+```
+
+### Building
+```bash
+# Debug build
+./gradlew assembleDebug
+
+# Release build
+./gradlew assembleRelease
+
+# Run tests
+./gradlew test
+
+# Run lint
+./gradlew lint
+```
+
+## Debugging
+
+The app includes comprehensive debugging features:
+
+- **History Tracking**: ALL received SMS messages are logged
+- **Visual Indicators**: See which SMS matched rules (✓/✗)
+- **Enhanced Logging**: Detailed logs with emoji indicators
+- **Statistics Dashboard**: Success rates and processing metrics
+- **Debug Instructions**: Built-in troubleshooting guide
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+The PR Check workflow will automatically validate your changes.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Security
+
+- APKs in releases are unsigned for security
+- For production use, sign with your own keystore
+- Regular security scans via GitHub Actions
+- Dependencies are automatically checked for vulnerabilities
+
+## Support
+
+- 📖 Check the debug instructions in the Settings tab
+- 🐛 Report issues on GitHub
+- 💡 Feature requests welcome
+- 📝 Check development logs in `/development_logs/` 
