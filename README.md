@@ -170,6 +170,7 @@ This project includes comprehensive GitHub Actions workflows:
 - Pull requests to `master` or `main`
 - Manual workflow dispatch
 - Tag pushes (creates releases)
+- **Commit messages starting with "release:"** (creates releases)
 
 **Features**:
 - ✅ Builds both debug and release APKs
@@ -193,17 +194,25 @@ This project includes comprehensive GitHub Actions workflows:
 
 ### Creating a Release
 
-#### Automatic Release (Recommended)
-1. Push a git tag:
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
-2. GitHub Actions will automatically:
-   - Build the APKs
-   - Create a GitHub release
-   - Attach APK files
-   - Generate release notes
+#### Automatic Release Options
+
+**Option 1: Release Commit (Recommended)**
+```bash
+git commit -m "release: Add SMS detail view and fix permissions"
+git push origin main
+```
+
+**Option 2: Git Tag**
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Both methods will automatically:
+- Build the APKs
+- Create a GitHub release
+- Attach APK files
+- Generate release notes
 
 #### Manual Release
 1. Go to the Actions tab in GitHub
