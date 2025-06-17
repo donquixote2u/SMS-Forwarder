@@ -21,35 +21,44 @@ class SmsReceiver : BroadcastReceiver() {
     }
     
     override fun onReceive(context: Context?, intent: Intent?) {
-        Log.d(TAG, "SMS received, action: ${intent?.action}")
+        Log.i(TAG, "=== SMS BROADCAST RECEIVED ===")
+        Log.i(TAG, "Action: ${intent?.action}")
+        Log.i(TAG, "Context: ${context?.javaClass?.simpleName}")
         
         if (context == null || intent == null) {
-            Log.w(TAG, "Context or intent is null")
+            Log.e(TAG, "❌ Context or intent is null - SMS processing aborted")
             return
         }
         
         // Only process SMS_RECEIVED intents
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            Log.d(TAG, "Ignoring non-SMS intent: ${intent.action}")
+            Log.w(TAG, "❌ Ignoring non-SMS intent: ${intent.action}")
             return
         }
+        
+        Log.i(TAG, "✅ SMS_RECEIVED intent confirmed - processing...")
         
         try {
             // Extract SMS messages from the intent
             val smsMessages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             
             if (smsMessages.isNullOrEmpty()) {
-                Log.w(TAG, "No SMS messages found in intent")
+                Log.e(TAG, "❌ No SMS messages found in intent")
                 return
             }
             
+            Log.i(TAG, "📱 Found ${smsMessages.size} SMS message(s) in intent")
+            
             // Process each SMS message
-            for (smsMessage in smsMessages) {
+            for ((i, smsMessage) in smsMessages.withIndex()) {
                 val sender = smsMessage.originatingAddress ?: "Unknown"
                 val body = smsMessage.messageBody ?: ""
                 val timestamp = Clock.System.now() // Use current time as fallback
                 
-                Log.d(TAG, "Processing SMS from: $sender, body length: ${body.length}")
+                Log.i(TAG, "📨 Processing SMS #${i + 1}:")
+                Log.i(TAG, "  From: $sender")
+                Log.i(TAG, "  Body length: ${body.length}")
+                Log.i(TAG, "  Body preview: \"${body.take(50)}${if (body.length > 50) "..." else ""}\"")
                 
                 if (body.isNotBlank()) {
                     val domainSms = SmsMessage(
@@ -66,12 +75,15 @@ class SmsReceiver : BroadcastReceiver() {
                         putExtra(SmsForwardingService.EXTRA_SMS_TIMESTAMP, timestamp.epochSeconds)
                     }
                     
+                    Log.i(TAG, "🚀 Starting SmsForwardingService...")
                     context.startForegroundService(serviceIntent)
-                    Log.d(TAG, "Started SmsForwardingService for SMS processing")
+                    Log.i(TAG, "✅ SmsForwardingService started successfully")
+                } else {
+                    Log.w(TAG, "⚠️ SMS body is blank, skipping")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error processing SMS: ${e.message}", e)
+            Log.e(TAG, "💥 Error processing SMS: ${e.message}", e)
         }
     }
 } 

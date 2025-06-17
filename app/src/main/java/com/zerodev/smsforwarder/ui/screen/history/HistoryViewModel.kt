@@ -43,8 +43,10 @@ class HistoryViewModel @Inject constructor(
                     )
                 }
                 .collect { history ->
+                    val matchedCount = history.count { it.matchedRule }
                     _uiState.value = _uiState.value.copy(
                         history = history,
+                        matchedCount = matchedCount,
                         isLoading = false,
                         error = null
                     )

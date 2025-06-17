@@ -82,6 +82,65 @@ fun SettingsScreen() {
             
             Spacer(modifier = Modifier.height(16.dp))
             
+            // Debugging Section
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Debug Instructions",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "To test SMS forwarding:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "1. Ensure SMS permissions are granted above",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "2. Create a forwarding rule in the Rules tab",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "3. Send an SMS to your phone (from another phone)",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "4. Check the History tab - ALL received SMS will appear there",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "5. Check logcat for detailed logs (tag: SmsReceiver, SmsForwardingService)",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = "💡 Tip: The History tab now shows ALL received SMS messages, even ones that don't match any rules. This helps debug if SMS are being received at all.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
             // App Info Section
             Card(
                 modifier = Modifier.fillMaxWidth()

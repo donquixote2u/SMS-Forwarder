@@ -67,7 +67,7 @@ object EntityMapper {
     /**
      * Convert HistoryEntity to ForwardingHistory domain model.
      */
-    fun HistoryEntity.toDomain(ruleName: String = ""): ForwardingHistory {
+    fun HistoryEntity.toDomain(ruleName: String = "N/A"): ForwardingHistory {
         val smsMessage = SmsMessage(
             body = smsBody,
             sender = smsFrom,
@@ -79,6 +79,7 @@ object EntityMapper {
             ruleId = ruleId,
             ruleName = ruleName,
             smsMessage = smsMessage,
+            matchedRule = matchedRule,
             requestPayload = requestPayload,
             responseCode = responseCode,
             responseBody = responseBody,
@@ -98,6 +99,7 @@ object EntityMapper {
             smsBody = smsMessage.body,
             smsFrom = smsMessage.sender,
             smsTimestamp = smsMessage.timestamp,
+            matchedRule = matchedRule,
             requestPayload = requestPayload,
             responseCode = responseCode,
             responseBody = responseBody,

@@ -29,7 +29,11 @@ class HistoryRepository @Inject constructor(
     fun getAllHistory(): Flow<List<ForwardingHistory>> {
         return historyDao.getAllHistory().map { entities ->
             entities.map { entity ->
-                val ruleName = ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                val ruleName = if (entity.ruleId != null) {
+                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                } else {
+                    "N/A"
+                }
                 entity.toDomain(ruleName)
             }
         }
@@ -43,7 +47,11 @@ class HistoryRepository @Inject constructor(
     fun getHistoryByRule(ruleId: Long): Flow<List<ForwardingHistory>> {
         return historyDao.getHistoryByRule(ruleId).map { entities ->
             entities.map { entity ->
-                val ruleName = ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                val ruleName = if (entity.ruleId != null) {
+                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                } else {
+                    "N/A"
+                }
                 entity.toDomain(ruleName)
             }
         }
@@ -56,7 +64,11 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun getHistoryById(id: Long): ForwardingHistory? {
         val entity = historyDao.getHistoryById(id) ?: return null
-        val ruleName = ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+        val ruleName = if (entity.ruleId != null) {
+            ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+        } else {
+            "N/A"
+        }
         return entity.toDomain(ruleName)
     }
     
@@ -90,7 +102,11 @@ class HistoryRepository @Inject constructor(
     fun getHistoryByStatus(status: ForwardingStatus): Flow<List<ForwardingHistory>> {
         return historyDao.getHistoryByStatus(status).map { entities ->
             entities.map { entity ->
-                val ruleName = ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                val ruleName = if (entity.ruleId != null) {
+                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                } else {
+                    "N/A"
+                }
                 entity.toDomain(ruleName)
             }
         }
@@ -136,7 +152,11 @@ class HistoryRepository @Inject constructor(
         val last24Hours = Clock.System.now().epochSeconds - (24 * 60 * 60)
         return historyDao.getRecentHistory(last24Hours).map { entities ->
             entities.map { entity ->
-                val ruleName = ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                val ruleName = if (entity.ruleId != null) {
+                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
+                } else {
+                    "N/A"
+                }
                 entity.toDomain(ruleName)
             }
         }

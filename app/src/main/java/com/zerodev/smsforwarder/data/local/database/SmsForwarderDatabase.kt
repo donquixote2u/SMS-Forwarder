@@ -17,7 +17,7 @@ import com.zerodev.smsforwarder.data.local.entity.HistoryEntity
  */
 @Database(
     entities = [RuleEntity::class, HistoryEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

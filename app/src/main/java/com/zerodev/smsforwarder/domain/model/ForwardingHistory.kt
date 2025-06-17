@@ -15,22 +15,24 @@ enum class StatusColor {
  * This is the business logic representation, separate from database entities.
  * 
  * @property id Unique identifier for the history entry
- * @property ruleId Reference to the rule that triggered this forwarding
+ * @property ruleId Reference to the rule that triggered this forwarding (null if no rule matched)
  * @property ruleName Name of the rule for display purposes
- * @property smsMessage The SMS message that was forwarded
- * @property requestPayload The JSON payload sent to the API
- * @property responseCode HTTP response code (null if request failed)
- * @property responseBody HTTP response body (null if request failed)
+ * @property smsMessage The SMS message that was received/forwarded
+ * @property matchedRule Whether this SMS matched any forwarding rule
+ * @property requestPayload The JSON payload sent to the API (null if no rule matched)
+ * @property responseCode HTTP response code (null if request failed or no rule matched)
+ * @property responseBody HTTP response body (null if request failed or no rule matched)
  * @property status Success or failure status
  * @property errorMessage Error details if forwarding failed
  * @property createdAt Timestamp when this history entry was created
  */
 data class ForwardingHistory(
     val id: Long = 0,
-    val ruleId: Long,
+    val ruleId: Long? = null, // Nullable to support non-matching SMS
     val ruleName: String,
     val smsMessage: SmsMessage,
-    val requestPayload: String,
+    val matchedRule: Boolean = false, // Whether SMS matched any rule
+    val requestPayload: String? = null, // Nullable for non-matching SMS
     val responseCode: Int? = null,
     val responseBody: String? = null,
     val status: ForwardingStatus,
@@ -75,6 +77,8 @@ data class ForwardingHistory(
             ForwardingStatus.FAILED -> "Failed"
             ForwardingStatus.PENDING -> "Pending"
             ForwardingStatus.RETRYING -> "Retrying"
+            ForwardingStatus.NO_RULE_MATCHED -> "No Rule Matched"
+            ForwardingStatus.RECEIVED -> "Received"
         }
     }
     
@@ -89,6 +93,8 @@ data class ForwardingHistory(
             ForwardingStatus.FAILED -> StatusColor.ERROR
             ForwardingStatus.PENDING -> StatusColor.INFO
             ForwardingStatus.RETRYING -> StatusColor.WARNING
+            ForwardingStatus.NO_RULE_MATCHED -> StatusColor.WARNING
+            ForwardingStatus.RECEIVED -> StatusColor.INFO
         }
     }
     

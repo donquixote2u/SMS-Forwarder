@@ -37,35 +37,78 @@ class SmsForwardingUseCase @Inject constructor(
     
     /**
      * Process an incoming SMS message by finding matching rules and forwarding to their endpoints.
-     * This method runs in parallel for all matching rules.
+     * This method runs in parallel for all matching rules and ALWAYS logs the SMS to history for debugging.
      * 
      * @param smsMessage The incoming SMS message to process
      * @return List of ForwardingHistory entries representing the forwarding attempts
      */
     suspend fun processSms(smsMessage: SmsMessage): List<ForwardingHistory> {
-        Log.d(TAG, "Processing SMS from ${smsMessage.getMaskedSender()}")
+        Log.d(TAG, "=== SMS RECEIVED ===")
+        Log.d(TAG, "From: ${smsMessage.getMaskedSender()}")
+        Log.d(TAG, "Body: ${smsMessage.body}")
+        Log.d(TAG, "Timestamp: ${smsMessage.timestamp}")
         
         if (!smsMessage.isValid()) {
-            Log.w(TAG, "Invalid SMS message, skipping processing")
+            Log.w(TAG, "Invalid SMS message, saving to history as invalid")
+                         // Save invalid SMS to history for debugging
+             val invalidHistory = ForwardingHistory(
+                 ruleId = null,
+                 ruleName = "N/A",
+                 smsMessage = smsMessage,
+                 matchedRule = false,
+                 requestPayload = null,
+                 status = ForwardingStatus.FAILED,
+                 errorMessage = "Invalid SMS message (empty body or sender)",
+                 createdAt = Clock.System.now()
+             )
+            historyRepository.createHistory(invalidHistory)
             return emptyList()
         }
         
         // Get all active rules
         val activeRules = ruleRepository.getActiveRules().first()
+        Log.d(TAG, "Found ${activeRules.size} active rules")
         
         if (activeRules.isEmpty()) {
-            Log.d(TAG, "No active rules found, skipping processing")
+            Log.d(TAG, "No active rules found, saving SMS as no rules configured")
+                         // Save SMS to history even when no rules exist
+             val noRulesHistory = ForwardingHistory(
+                 ruleId = null,
+                 ruleName = "N/A",
+                 smsMessage = smsMessage,
+                 matchedRule = false,
+                 requestPayload = null,
+                 status = ForwardingStatus.NO_RULE_MATCHED,
+                 errorMessage = "No active rules configured",
+                 createdAt = Clock.System.now()
+             )
+            historyRepository.createHistory(noRulesHistory)
             return emptyList()
         }
         
         // Find matching rules
         val matchingRules = activeRules.filter { rule ->
-            rule.matches(smsMessage.body)
+            val matches = rule.matches(smsMessage.body)
+            Log.d(TAG, "Rule '${rule.name}' (pattern: '${rule.pattern}') matches: $matches")
+            matches
         }
         
         Log.d(TAG, "Found ${matchingRules.size} matching rules out of ${activeRules.size} active rules")
         
         if (matchingRules.isEmpty()) {
+            Log.d(TAG, "No matching rules found, saving SMS as no match")
+                         // Save SMS to history when no rules match
+             val noMatchHistory = ForwardingHistory(
+                 ruleId = null,
+                 ruleName = "N/A",
+                 smsMessage = smsMessage,
+                 matchedRule = false,
+                 requestPayload = null,
+                 status = ForwardingStatus.NO_RULE_MATCHED,
+                 errorMessage = "SMS content did not match any rule patterns",
+                 createdAt = Clock.System.now()
+             )
+            historyRepository.createHistory(noMatchHistory)
             return emptyList()
         }
         
@@ -96,6 +139,7 @@ class SmsForwardingUseCase @Inject constructor(
             ruleId = rule.id,
             ruleName = rule.name,
             smsMessage = smsMessage,
+            matchedRule = true,
             requestPayload = requestPayload,
             status = ForwardingStatus.PENDING,
             createdAt = Clock.System.now()

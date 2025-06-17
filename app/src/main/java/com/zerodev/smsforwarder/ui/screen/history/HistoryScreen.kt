@@ -53,7 +53,8 @@ fun HistoryScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        StatisticItem("Total", uiState.totalCount.toString())
+                        StatisticItem("Total SMS", uiState.totalCount.toString())
+                        StatisticItem("Matched", uiState.matchedCount.toString())
                         StatisticItem("Success", uiState.successCount.toString())
                         StatisticItem("Failed", uiState.failedCount.toString())
                     }
@@ -84,12 +85,12 @@ fun HistoryScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "No History Yet",
+                                text = "No SMS Messages Yet",
                                 style = MaterialTheme.typography.headlineSmall
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "SMS forwarding attempts will appear here",
+                                text = "Received SMS messages will appear here for debugging.\nSend an SMS to your phone to test.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -145,19 +146,36 @@ private fun HistoryItem(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = historyEntry.ruleName,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = if (historyEntry.matchedRule) "Rule: ${historyEntry.ruleName}" else "No Rule Matched",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (historyEntry.matchedRule) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
+                    if (historyEntry.matchedRule) {
+                        Text(
+                            text = "✓ Pattern matched",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            text = "✗ Pattern not matched",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 StatusChip(historyEntry = historyEntry)
             }
             
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = "SMS: ${historyEntry.smsMessage.getTruncatedBody(60)}",
-                style = MaterialTheme.typography.bodyMedium
+                text = "SMS: \"${historyEntry.smsMessage.getTruncatedBody(60)}\"",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
             )
             Text(
                 text = "From: ${historyEntry.smsMessage.getMaskedSender()}",
@@ -234,6 +252,7 @@ private fun StatusChip(
 data class HistoryUiState(
     val history: List<ForwardingHistory> = emptyList(),
     val totalCount: Int = 0,
+    val matchedCount: Int = 0,
     val successCount: Int = 0,
     val failedCount: Int = 0,
     val isLoading: Boolean = false,
