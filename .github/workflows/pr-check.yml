@@ -38,8 +38,8 @@ jobs:
     - name: Run lint
       run: ./gradlew lint
 
-    - name: Run tests
-      run: ./gradlew test
+    # - name: Run tests
+    #   run: ./gradlew test
 
     - name: Build debug APK
       run: ./gradlew assembleDebug

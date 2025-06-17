@@ -7,6 +7,11 @@
     <uses-permission android:name="android.permission.READ_SMS" />
     <uses-permission android:name="android.permission.INTERNET" />
     
+    <!-- Declare that telephony hardware is not required -->
+    <uses-feature 
+        android:name="android.hardware.telephony" 
+        android:required="false" />
+    
     <!-- Boot receiver permission -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
