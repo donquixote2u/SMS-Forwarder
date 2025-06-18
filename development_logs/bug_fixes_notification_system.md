@@ -46,6 +46,77 @@ Fixed critical functional issues in the SMS and notification forwarding system t
 **Files Changed**:
 - `app/src/main/java/com/zerodev/smsforwarder/data/repository/AppRepository.kt`
 
+### 4. Retrofit Type Parameter Wildcard Error (Critical Fix)
+
+**Issue**: SMS and notification forwarding failing with error:
+```
+Failed after 3 attempts: Parameter type must not include a type variable or wildcard: 
+java.util.Map<java.lang.String, ?>(parameter #3) for method ForwardingApiService.postEndpoint
+```
+
+**Root Cause**: 
+- **Generic Type Issues**: `Map<String, Any>` with complex nested objects (like notification extras) caused Retrofit serialization problems
+- **Gson Limitations**: Gson cannot properly serialize `Any` type when it contains complex objects, arrays, or nested maps
+- **Type Erasure**: Java type erasure made generic `Map<String, Any>` ambiguous for Retrofit reflection
+
+**Real Solution Implemented**:
+
+**1. Changed API Service to String Bodies:**
+```kotlin
+// Before (caused serialization issues):
+@Body body: Map<String, Any>  // ← Complex objects broke serialization
+
+// After (works reliably):
+@Body body: String            // ← Pre-serialized JSON string
+```
+
+**2. Manual JSON Serialization:**
+```kotlin
+// Convert payload to JSON before sending to Retrofit
+val jsonPayload = try {
+    gson.toJson(payload)
+} catch (e: Exception) {
+    return ForwardingResult.NetworkError(...)
+}
+
+// Send as string to Retrofit
+apiService.postToEndpoint(rule.endpoint, headers, jsonPayload)
+```
+
+**3. Cleaned Notification Extras:**
+```kotlin
+val cleanExtras: Map<String, Any> = extras
+    .filterValues { it != null }
+    .mapValues { entry -> 
+        when (val value = entry.value!!) {
+            is String, is Number, is Boolean -> value
+            is Collection<*> -> value.mapNotNull { it?.toString() }
+            is Array<*> -> value.mapNotNull { it?.toString() }
+            else -> value.toString()  // Convert complex objects to strings
+        }
+    }
+```
+
+**4. Added Scalars Converter:**
+```kotlin
+// In NetworkModule
+.addConverterFactory(ScalarsConverterFactory.create())
+.addConverterFactory(GsonConverterFactory.create(gson))
+```
+
+**Impact**: 
+- ✅ **SMS forwarding works** - JSON serialization handles all primitive types
+- ✅ **Notification forwarding functional** - complex extras converted to strings  
+- ✅ **HTTP requests succeed** - Retrofit handles String bodies reliably
+- ✅ **History shows success** - no more serialization errors
+- ✅ **Proper JSON output** - endpoints receive well-formed JSON
+
+**Technical Details**:
+- **Problem**: Retrofit couldn't serialize `Map<String, Any>` when `Any` included complex objects
+- **Solution**: Pre-serialize to JSON string, let Retrofit handle strings only
+- **Benefit**: Complete control over JSON serialization, handles all data types
+- **Performance**: Minimal overhead, better error handling
+
 ## Impact Assessment
 
 ### Functional Impact

@@ -1,5 +1,6 @@
 package com.zerodev.smsforwarder.data.remote.client
 
+import com.google.gson.Gson
 import com.zerodev.smsforwarder.data.remote.api.ForwardingApiService
 import com.zerodev.smsforwarder.domain.model.Rule
 import com.zerodev.smsforwarder.domain.model.SmsMessage
@@ -14,7 +15,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class HttpClient @Inject constructor(
-    private val apiService: ForwardingApiService
+    private val apiService: ForwardingApiService,
+    private val gson: Gson
 ) {
     
     companion object {
@@ -57,14 +59,26 @@ class HttpClient @Inject constructor(
         extras: Map<String, Any?>,
         rule: Rule
     ): ForwardingResult {
-        val payload = mapOf(
+        // Convert extras to JSON-serializable primitives only
+        val cleanExtras: Map<String, Any> = extras
+            .filterValues { it != null }
+            .mapValues { entry -> 
+                when (val value = entry.value!!) {
+                    is String, is Number, is Boolean -> value
+                    is Collection<*> -> value.mapNotNull { it?.toString() }
+                    is Array<*> -> value.mapNotNull { it?.toString() }
+                    else -> value.toString()
+                }
+            }
+        
+        val payload: Map<String, Any> = mapOf(
             "sourceType" to "NOTIFICATION",
             "packageName" to packageName,
             "appLabel" to appLabel,
             "title" to title,
             "text" to text,
             "postTime" to postTime,
-            "extras" to extras,
+            "extras" to cleanExtras,
             "timestamp" to System.currentTimeMillis()
         )
         
@@ -74,13 +88,13 @@ class HttpClient @Inject constructor(
     /**
      * Forward a generic payload to an endpoint according to the rule configuration.
      * 
-     * @param payload The data payload to forward
+     * @param payload The data payload to forward (no null values)
      * @param rule The forwarding rule configuration
      * @param sourceType Source type for logging ("SMS" or "NOTIFICATION")
      * @return ForwardingResult indicating success or failure
      */
     private suspend fun forwardPayload(
-        payload: Map<String, Any?>,
+        payload: Map<String, Any>,
         rule: Rule,
         sourceType: String
     ): ForwardingResult {
@@ -90,8 +104,15 @@ class HttpClient @Inject constructor(
             putIfAbsent("X-Source-Type", sourceType)
         }
         
-        // Filter out null values and convert to Map<String, Any>
-        val cleanPayload = payload.filterValues { it != null }.mapValues { it.value!! }
+        // Serialize payload to JSON string
+        val jsonPayload = try {
+            gson.toJson(payload)
+        } catch (e: Exception) {
+            return ForwardingResult.NetworkError(
+                exception = e,
+                message = "Failed to serialize payload to JSON: ${e.message}"
+            )
+        }
         
         return executeWithRetry(
             maxAttempts = MAX_RETRY_ATTEMPTS,
@@ -99,21 +120,21 @@ class HttpClient @Inject constructor(
         ) {
             when (rule.method.uppercase()) {
                 "GET" -> {
-                    val queryParams = cleanPayload.mapValues { it.value.toString() }
+                    val queryParams: Map<String, String> = payload.mapValues { it.value.toString() }
                     apiService.getFromEndpoint(rule.endpoint, headers, queryParams)
                 }
                 "POST" -> {
-                    apiService.postToEndpoint(rule.endpoint, headers, cleanPayload)
+                    apiService.postToEndpoint(rule.endpoint, headers, jsonPayload)
                 }
                 "PUT" -> {
-                    apiService.putToEndpoint(rule.endpoint, headers, cleanPayload)
+                    apiService.putToEndpoint(rule.endpoint, headers, jsonPayload)
                 }
                 "PATCH" -> {
-                    apiService.patchToEndpoint(rule.endpoint, headers, cleanPayload)
+                    apiService.patchToEndpoint(rule.endpoint, headers, jsonPayload)
                 }
                 else -> {
                     // Default to POST for unknown methods
-                    apiService.postToEndpoint(rule.endpoint, headers, cleanPayload)
+                    apiService.postToEndpoint(rule.endpoint, headers, jsonPayload)
                 }
             }
         }
@@ -130,7 +151,7 @@ class HttpClient @Inject constructor(
     private suspend fun executeWithRetry(
         maxAttempts: Int,
         initialDelay: Long,
-        request: suspend () -> Response<Any>
+        request: suspend () -> Response<String>
     ): ForwardingResult {
         var lastException: Exception? = null
         var currentDelay = initialDelay
@@ -142,7 +163,7 @@ class HttpClient @Inject constructor(
                 return if (response.isSuccessful) {
                     ForwardingResult.Success(
                         responseCode = response.code(),
-                        responseBody = response.body()?.toString()
+                        responseBody = response.body()
                     )
                 } else {
                     ForwardingResult.HttpError(

@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -61,7 +62,7 @@ object NetworkModule {
     
     /**
      * Provide Retrofit instance.
-     * Since we use dynamic URLs, we don't need a base URL.
+     * Using ScalarsConverterFactory for String body requests.
      */
     @Provides
     @Singleton
@@ -72,6 +73,7 @@ object NetworkModule {
         return Retrofit.Builder()
             .baseUrl("https://api.placeholder.com/") // Placeholder base URL
             .client(okHttpClient)
+            .addConverterFactory(ScalarsConverterFactory.create())
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
