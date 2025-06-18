@@ -21,11 +21,12 @@ data class SmsMessage(
      */
     fun toApiPayload(): Map<String, Any> {
         return mapOf(
-            "sms_body" to body,
-            "sms_sender" to sender,
-            "sms_timestamp" to timestamp.epochSeconds,
-            "sms_timestamp_iso" to timestamp.toString(),
-            "received_at" to Instant.fromEpochSeconds(System.currentTimeMillis() / 1000).toString()
+            "sourceType" to "SMS",
+            "senderNumber" to sender,
+            "messageBody" to body,
+            "timestamp" to timestamp.toEpochMilliseconds(),
+            "timestampIso" to timestamp.toString(),
+            "receivedAt" to System.currentTimeMillis()
         )
     }
     

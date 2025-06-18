@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,10 +14,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.zerodev.smsforwarder.domain.model.Rule
+import com.zerodev.smsforwarder.domain.model.SourceType
 import kotlinx.datetime.Clock
 
 /**
- * Dialog for adding a new SMS forwarding rule.
+ * Dialog for adding a new SMS or notification forwarding rule.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,8 +32,12 @@ fun AddRuleDialog(
     var endpoint by remember { mutableStateOf("") }
     var method by remember { mutableStateOf("POST") }
     var headers by remember { mutableStateOf("") }
+    var sourceType by remember { mutableStateOf(SourceType.SMS) }
+    var packageFilter by remember { mutableStateOf("") }
+    var usePackageFilter by remember { mutableStateOf(false) }
     
-    val isValid = name.isNotBlank() && pattern.isNotBlank() && endpoint.isNotBlank()
+    val isValid = name.isNotBlank() && pattern.isNotBlank() && endpoint.isNotBlank() &&
+            (sourceType == SourceType.SMS || !usePackageFilter || packageFilter.isNotBlank())
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -51,6 +58,30 @@ fun AddRuleDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
+                // Source Type Selection
+                Text(
+                    text = "Source Type",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    FilterChip(
+                        onClick = { sourceType = SourceType.SMS },
+                        label = { Text("SMS") },
+                        selected = sourceType == SourceType.SMS,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    FilterChip(
+                        onClick = { sourceType = SourceType.NOTIFICATION },
+                        label = { Text("Notifications") },
+                        selected = sourceType == SourceType.NOTIFICATION
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 // Rule Name
                 OutlinedTextField(
                     value = name,
@@ -66,8 +97,18 @@ fun AddRuleDialog(
                 OutlinedTextField(
                     value = pattern,
                     onValueChange = { pattern = it },
-                    label = { Text("SMS Pattern") },
-                    placeholder = { Text("e.g., 'OTP' or '[0-9]{6}' for regex") },
+                    label = { 
+                        Text(
+                            if (sourceType == SourceType.SMS) "SMS Pattern" 
+                            else "Notification Pattern"
+                        ) 
+                    },
+                    placeholder = { 
+                        Text(
+                            if (sourceType == SourceType.SMS) "e.g., 'OTP' or '[0-9]{6}' for regex"
+                            else "e.g., 'new message' or 'WhatsApp.*' for regex"
+                        ) 
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     maxLines = 3
                 )
@@ -91,6 +132,89 @@ fun AddRuleDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Use as Regular Expression")
+                }
+                
+                // Package Filter for Notifications
+                if (sourceType == SourceType.NOTIFICATION) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = usePackageFilter,
+                                onClick = { usePackageFilter = !usePackageFilter },
+                                role = Role.Checkbox
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = usePackageFilter,
+                            onCheckedChange = { usePackageFilter = it }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Filter by specific app")
+                    }
+                    
+                    if (usePackageFilter) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // App Selection Button instead of text input
+                        var showAppPicker by remember { mutableStateOf(false) }
+                        var selectedAppName by remember { mutableStateOf("") }
+                        
+                        OutlinedButton(
+                            onClick = { showAppPicker = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (selectedAppName.isNotEmpty()) {
+                                        selectedAppName
+                                    } else {
+                                        "Select App"
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search apps"
+                                )
+                            }
+                        }
+                        
+                        if (packageFilter.isNotEmpty()) {
+                            Text(
+                                text = "Package: $packageFilter",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        
+                        Text(
+                            text = "Leave unchecked to match notifications from all apps",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        
+                        // App Picker Dialog
+                        if (showAppPicker) {
+                            AppPickerDialog(
+                                onDismiss = { showAppPicker = false },
+                                onAppSelected = { selectedApp ->
+                                    packageFilter = selectedApp.packageName
+                                    selectedAppName = selectedApp.appName
+                                    showAppPicker = false
+                                }
+                            )
+                        }
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -180,6 +304,10 @@ fun AddRuleDialog(
                                 method = method,
                                 headers = headersMap,
                                 isActive = true,
+                                source = sourceType,
+                                packageFilter = if (sourceType == SourceType.NOTIFICATION && usePackageFilter) {
+                                    packageFilter.trim().takeIf { it.isNotBlank() }
+                                } else null,
                                 createdAt = now,
                                 updatedAt = now
                             )

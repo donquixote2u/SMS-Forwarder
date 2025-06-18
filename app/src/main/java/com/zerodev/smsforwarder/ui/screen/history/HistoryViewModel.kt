@@ -2,7 +2,8 @@ package com.zerodev.smsforwarder.ui.screen.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.zerodev.smsforwarder.data.local.entity.ForwardingStatus
+import com.zerodev.smsforwarder.domain.model.ForwardingStatus
+import com.zerodev.smsforwarder.domain.model.ForwardingHistory
 import com.zerodev.smsforwarder.data.repository.HistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -2,10 +2,10 @@ package com.zerodev.smsforwarder.data.repository
 
 import com.zerodev.smsforwarder.data.local.dao.HistoryDao
 import com.zerodev.smsforwarder.data.local.dao.RuleDao
-import com.zerodev.smsforwarder.data.local.entity.ForwardingStatus
 import com.zerodev.smsforwarder.data.mapper.EntityMapper.toDomain
 import com.zerodev.smsforwarder.data.mapper.EntityMapper.toEntity
 import com.zerodev.smsforwarder.domain.model.ForwardingHistory
+import com.zerodev.smsforwarder.domain.model.ForwardingStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
@@ -13,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Repository for managing SMS forwarding history.
+ * Repository for managing forwarding history (SMS and notifications).
  * Provides a clean API for history operations.
  */
 @Singleton
@@ -28,14 +28,7 @@ class HistoryRepository @Inject constructor(
      */
     fun getAllHistory(): Flow<List<ForwardingHistory>> {
         return historyDao.getAllHistory().map { entities ->
-            entities.map { entity ->
-                val ruleName = if (entity.ruleId != null) {
-                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
-                } else {
-                    "N/A"
-                }
-                entity.toDomain(ruleName)
-            }
+            entities.map { entity -> entity.toDomain() }
         }
     }
     
@@ -46,14 +39,29 @@ class HistoryRepository @Inject constructor(
      */
     fun getHistoryByRule(ruleId: Long): Flow<List<ForwardingHistory>> {
         return historyDao.getHistoryByRule(ruleId).map { entities ->
-            entities.map { entity ->
-                val ruleName = if (entity.ruleId != null) {
-                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
-                } else {
-                    "N/A"
-                }
-                entity.toDomain(ruleName)
-            }
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    /**
+     * Get history entries by source type.
+     * @param sourceType The source type ("SMS" or "NOTIFICATION")
+     * @return Flow of history entries for the specified source type
+     */
+    fun getHistoryBySourceType(sourceType: String): Flow<List<ForwardingHistory>> {
+        return historyDao.getHistoryBySourceType(sourceType).map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    /**
+     * Get history entries for a specific package (notifications only).
+     * @param packageName The package name
+     * @return Flow of history entries for the specified package
+     */
+    fun getHistoryByPackage(packageName: String): Flow<List<ForwardingHistory>> {
+        return historyDao.getHistoryByPackage(packageName).map { entities ->
+            entities.map { entity -> entity.toDomain() }
         }
     }
     
@@ -64,12 +72,7 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun getHistoryById(id: Long): ForwardingHistory? {
         val entity = historyDao.getHistoryById(id) ?: return null
-        val ruleName = if (entity.ruleId != null) {
-            ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
-        } else {
-            "N/A"
-        }
-        return entity.toDomain(ruleName)
+        return entity.toDomain()
     }
     
     /**
@@ -79,8 +82,7 @@ class HistoryRepository @Inject constructor(
      */
     suspend fun createHistory(history: ForwardingHistory): Long {
         val historyToInsert = history.copy(
-            id = 0, // Let database generate ID
-            createdAt = Clock.System.now()
+            id = 0 // Let database generate ID
         )
         
         return historyDao.insertHistory(historyToInsert.toEntity())
@@ -100,15 +102,8 @@ class HistoryRepository @Inject constructor(
      * @return Flow of history entries with the specified status
      */
     fun getHistoryByStatus(status: ForwardingStatus): Flow<List<ForwardingHistory>> {
-        return historyDao.getHistoryByStatus(status).map { entities ->
-            entities.map { entity ->
-                val ruleName = if (entity.ruleId != null) {
-                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
-                } else {
-                    "N/A"
-                }
-                entity.toDomain(ruleName)
-            }
+        return historyDao.getHistoryByStatus(status.name).map { entities ->
+            entities.map { entity -> entity.toDomain() }
         }
     }
     
@@ -141,7 +136,7 @@ class HistoryRepository @Inject constructor(
      * @return Count of entries with the specified status
      */
     suspend fun getHistoryCountByStatus(status: ForwardingStatus): Int {
-        return historyDao.getHistoryCountByStatus(status)
+        return historyDao.getHistoryCountByStatus(status.name)
     }
     
     /**
@@ -149,16 +144,9 @@ class HistoryRepository @Inject constructor(
      * @return Flow of recent history entries
      */
     fun getRecentHistory(): Flow<List<ForwardingHistory>> {
-        val last24Hours = Clock.System.now().epochSeconds - (24 * 60 * 60)
+        val last24Hours = Clock.System.now().toEpochMilliseconds() - (24 * 60 * 60 * 1000L)
         return historyDao.getRecentHistory(last24Hours).map { entities ->
-            entities.map { entity ->
-                val ruleName = if (entity.ruleId != null) {
-                    ruleDao.getRuleById(entity.ruleId)?.name ?: "Unknown Rule"
-                } else {
-                    "N/A"
-                }
-                entity.toDomain(ruleName)
-            }
+            entities.map { entity -> entity.toDomain() }
         }
     }
     
@@ -167,8 +155,40 @@ class HistoryRepository @Inject constructor(
      * @return Map of status to count
      */
     suspend fun getHistoryStatistics(): Map<ForwardingStatus, Int> {
+        val statusCounts = historyDao.getHistoryStatistics()
+        val statsMap = statusCounts.associate { it.status to it.count }
+        
         return ForwardingStatus.values().associateWith { status ->
-            getHistoryCountByStatus(status)
+            statsMap[status.name] ?: 0
         }
     }
+    
+    /**
+     * Get comprehensive statistics.
+     * @return HistoryStatistics object with all counts
+     */
+    suspend fun getComprehensiveStatistics(): HistoryStatistics {
+        return HistoryStatistics(
+            totalCount = historyDao.getTotalCount(),
+            successfulCount = historyDao.getSuccessfulCount(),
+            failedCount = historyDao.getFailedCount(),
+            matchedCount = historyDao.getMatchedCount()
+        )
+    }
+}
+
+/**
+ * Data class for comprehensive history statistics.
+ */
+data class HistoryStatistics(
+    val totalCount: Int,
+    val successfulCount: Int,
+    val failedCount: Int,
+    val matchedCount: Int
+) {
+    val successRate: Double
+        get() = if (totalCount > 0) (successfulCount.toDouble() / totalCount) * 100 else 0.0
+    
+    val matchRate: Double
+        get() = if (totalCount > 0) (matchedCount.toDouble() / totalCount) * 100 else 0.0
 } 

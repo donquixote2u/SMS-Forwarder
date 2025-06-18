@@ -3,12 +3,14 @@ package com.zerodev.smsforwarder.domain.model
 import kotlinx.datetime.Instant
 
 /**
- * Domain model representing an SMS forwarding rule.
+ * Domain model representing a forwarding rule for SMS or notifications.
  * This is the business logic representation, separate from database entities.
  * 
  * @property id Unique identifier for the rule
  * @property name Human-readable name for the rule
- * @property pattern Regex or substring pattern to match against SMS body
+ * @property pattern Regex or substring pattern to match against content
+ * @property source Source type - SMS or NOTIFICATION
+ * @property packageFilter Package name filter for notifications (required if source == NOTIFICATION, null means all packages)
  * @property isRegex Whether the pattern should be treated as regex (true) or substring (false)
  * @property endpoint HTTP API endpoint URL
  * @property method HTTP method (default: POST)
@@ -21,6 +23,8 @@ data class Rule(
     val id: Long = 0,
     val name: String,
     val pattern: String,
+    val source: SourceType,
+    val packageFilter: String? = null,
     val isRegex: Boolean = false,
     val endpoint: String,
     val method: String = "POST",
@@ -30,21 +34,38 @@ data class Rule(
     val updatedAt: Instant
 ) {
     /**
-     * Check if the given SMS body matches this rule's pattern.
+     * Check if the given content matches this rule's pattern.
+     * For SMS, content is the SMS body.
+     * For notifications, content is typically title + text combined.
      * 
-     * @param smsBody The SMS body content to match against
-     * @return true if the SMS body matches the pattern, false otherwise
+     * @param content The content to match against
+     * @return true if the content matches the pattern, false otherwise
      */
-    fun matches(smsBody: String): Boolean {
+    fun matches(content: String): Boolean {
         return try {
             if (isRegex) {
-                pattern.toRegex(RegexOption.IGNORE_CASE).containsMatchIn(smsBody)
+                pattern.toRegex(RegexOption.IGNORE_CASE).containsMatchIn(content)
             } else {
-                smsBody.contains(pattern, ignoreCase = true)
+                content.contains(pattern, ignoreCase = true)
             }
         } catch (e: Exception) {
             // If regex is invalid, fall back to substring matching
-            smsBody.contains(pattern, ignoreCase = true)
+            content.contains(pattern, ignoreCase = true)
+        }
+    }
+    
+    /**
+     * Check if this rule applies to the given package name.
+     * For SMS rules, this always returns true.
+     * For notification rules, checks against packageFilter.
+     * 
+     * @param packageName The package name to check
+     * @return true if the rule applies to this package, false otherwise
+     */
+    fun appliesToPackage(packageName: String): Boolean {
+        return when (source) {
+            SourceType.SMS -> true
+            SourceType.NOTIFICATION -> packageFilter == null || packageFilter == packageName
         }
     }
     
@@ -72,6 +93,11 @@ data class Rule(
         
         if (method.isBlank()) {
             errors.add("HTTP method cannot be empty")
+        }
+        
+        // Package filter validation for notification rules
+        if (source == SourceType.NOTIFICATION && packageFilter != null && packageFilter.isBlank()) {
+            errors.add("Package filter cannot be empty (use null to match all packages)")
         }
         
         // Test regex pattern if it's marked as regex

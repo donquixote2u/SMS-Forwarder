@@ -14,10 +14,14 @@ import com.zerodev.smsforwarder.data.local.entity.HistoryEntity
 /**
  * Room database for SMS Forwarder app.
  * Contains rules and history tables with their respective DAOs.
+ * 
+ * Version 4: Added support for notifications with source type and package filtering.
+ * - Updated RuleEntity with source and packageFilter fields
+ * - Updated HistoryEntity with comprehensive SMS and notification support
  */
 @Database(
     entities = [RuleEntity::class, HistoryEntity::class],
-    version = 2,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -59,7 +63,7 @@ abstract class SmsForwarderDatabase : RoomDatabase() {
                     SmsForwarderDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration() // For development - replace with proper migrations in production
                     .build()
                 INSTANCE = instance
                 instance

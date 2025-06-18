@@ -5,7 +5,7 @@ import com.zerodev.smsforwarder.data.local.entity.RuleEntity
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Data Access Object for SMS forwarding rules.
+ * Data Access Object for forwarding rules (SMS and notifications).
  * Provides database operations for managing forwarding rules.
  */
 @Dao
@@ -15,15 +15,31 @@ interface RuleDao {
      * Get all rules as a Flow for reactive updates.
      * @return Flow of all rules ordered by creation time (newest first)
      */
-    @Query("SELECT * FROM rules ORDER BY createdAt DESC")
+    @Query("SELECT * FROM rules ORDER BY created_at DESC")
     fun getAllRules(): Flow<List<RuleEntity>>
     
     /**
      * Get all active rules as a Flow.
      * @return Flow of active rules only
      */
-    @Query("SELECT * FROM rules WHERE isActive = 1 ORDER BY createdAt DESC")
+    @Query("SELECT * FROM rules WHERE is_active = 1 ORDER BY created_at DESC")
     fun getActiveRules(): Flow<List<RuleEntity>>
+    
+    /**
+     * Get active rules for a specific source type.
+     * @param sourceType The source type ("SMS" or "NOTIFICATION")
+     * @return Flow of active rules for the specified source type
+     */
+    @Query("SELECT * FROM rules WHERE is_active = 1 AND source = :sourceType ORDER BY created_at DESC")
+    fun getActiveRulesBySource(sourceType: String): Flow<List<RuleEntity>>
+    
+    /**
+     * Get active notification rules for a specific package.
+     * @param packageName The package name to filter by
+     * @return Flow of active notification rules for the specified package
+     */
+    @Query("SELECT * FROM rules WHERE is_active = 1 AND source = 'NOTIFICATION' AND (package_filter IS NULL OR package_filter = :packageName) ORDER BY created_at DESC")
+    fun getActiveNotificationRulesForPackage(packageName: String): Flow<List<RuleEntity>>
     
     /**
      * Get a specific rule by ID.
@@ -66,13 +82,21 @@ interface RuleDao {
      * @param id The rule ID
      * @param isActive The new active status
      */
-    @Query("UPDATE rules SET isActive = :isActive WHERE id = :id")
+    @Query("UPDATE rules SET is_active = :isActive WHERE id = :id")
     suspend fun toggleRuleStatus(id: Long, isActive: Boolean)
     
     /**
      * Get count of active rules.
      * @return Number of active rules
      */
-    @Query("SELECT COUNT(*) FROM rules WHERE isActive = 1")
+    @Query("SELECT COUNT(*) FROM rules WHERE is_active = 1")
     suspend fun getActiveRuleCount(): Int
+    
+    /**
+     * Get count of active rules by source type.
+     * @param sourceType The source type ("SMS" or "NOTIFICATION")
+     * @return Number of active rules for the specified source type
+     */
+    @Query("SELECT COUNT(*) FROM rules WHERE is_active = 1 AND source = :sourceType")
+    suspend fun getActiveRuleCountBySource(sourceType: String): Int
 } 

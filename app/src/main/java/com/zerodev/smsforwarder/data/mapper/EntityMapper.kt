@@ -7,6 +7,8 @@ import com.zerodev.smsforwarder.data.local.entity.HistoryEntity
 import com.zerodev.smsforwarder.domain.model.Rule
 import com.zerodev.smsforwarder.domain.model.ForwardingHistory
 import com.zerodev.smsforwarder.domain.model.SmsMessage
+import com.zerodev.smsforwarder.domain.model.SourceType
+import com.zerodev.smsforwarder.domain.model.ForwardingStatus
 
 /**
  * Mapper functions to convert between domain models and database entities.
@@ -26,10 +28,18 @@ object EntityMapper {
             emptyMap()
         }
         
+        val sourceType = try {
+            SourceType.valueOf(source)
+        } catch (e: Exception) {
+            SourceType.SMS // Default fallback
+        }
+        
         return Rule(
             id = id,
             name = name,
             pattern = pattern,
+            source = sourceType,
+            packageFilter = packageFilter,
             isRegex = isRegex,
             endpoint = endpoint,
             method = method,
@@ -54,6 +64,8 @@ object EntityMapper {
             id = id,
             name = name,
             pattern = pattern,
+            source = source.name,
+            packageFilter = packageFilter,
             isRegex = isRegex,
             endpoint = endpoint,
             method = method,
@@ -67,25 +79,33 @@ object EntityMapper {
     /**
      * Convert HistoryEntity to ForwardingHistory domain model.
      */
-    fun HistoryEntity.toDomain(ruleName: String = "N/A"): ForwardingHistory {
-        val smsMessage = SmsMessage(
-            body = smsBody,
-            sender = smsFrom,
-            timestamp = smsTimestamp
-        )
-        
+    fun HistoryEntity.toDomain(): ForwardingHistory {
         return ForwardingHistory(
             id = id,
             ruleId = ruleId,
-            ruleName = ruleName,
-            smsMessage = smsMessage,
             matchedRule = matchedRule,
-            requestPayload = requestPayload,
+            senderNumber = senderNumber,
+            messageBody = messageBody,
+            sourceType = sourceType,
+            sourcePackage = sourcePackage,
+            sourceAppName = sourceAppName,
+            notificationTitle = notificationTitle,
+            notificationText = notificationText,
+            endpoint = endpoint,
+            method = method,
+            requestHeaders = try {
+                val type = object : TypeToken<Map<String, String>>() {}.type
+                gson.fromJson<Map<String, String>>(requestHeaders, type) ?: emptyMap()
+            } catch (e: Exception) {
+                emptyMap()
+            },
+            requestBody = requestBody,
             responseCode = responseCode,
             responseBody = responseBody,
-            status = status,
+            status = ForwardingStatus.valueOf(status),
             errorMessage = errorMessage,
-            createdAt = createdAt
+            timestamp = timestamp,
+            forwardedAt = forwardedAt
         )
     }
     
@@ -93,19 +113,33 @@ object EntityMapper {
      * Convert ForwardingHistory domain model to HistoryEntity.
      */
     fun ForwardingHistory.toEntity(): HistoryEntity {
+        val headersJson = try {
+            gson.toJson(requestHeaders)
+        } catch (e: Exception) {
+            "{}"
+        }
+        
         return HistoryEntity(
             id = id,
             ruleId = ruleId,
-            smsBody = smsMessage.body,
-            smsFrom = smsMessage.sender,
-            smsTimestamp = smsMessage.timestamp,
             matchedRule = matchedRule,
-            requestPayload = requestPayload,
+            senderNumber = senderNumber,
+            messageBody = messageBody,
+            sourceType = sourceType,
+            sourcePackage = sourcePackage,
+            sourceAppName = sourceAppName,
+            notificationTitle = notificationTitle,
+            notificationText = notificationText,
+            endpoint = endpoint,
+            method = method,
+            requestHeaders = headersJson,
+            requestBody = requestBody,
             responseCode = responseCode,
             responseBody = responseBody,
-            status = status,
+            status = status.name,
             errorMessage = errorMessage,
-            createdAt = createdAt
+            timestamp = timestamp,
+            forwardedAt = forwardedAt
         )
     }
     

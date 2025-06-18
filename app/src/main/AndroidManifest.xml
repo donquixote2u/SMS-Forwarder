@@ -24,6 +24,67 @@
     
     <!-- Notification permission for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" android:minSdkVersion="33" />
+    
+    <!-- Notification listener permission -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    
+    <!-- Usage stats permission for MRU apps -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" 
+        tools:ignore="ProtectedPermissions" />
+    
+    <!-- Query all packages permission for comprehensive app list (requires special approval) -->
+    <!-- This is a fallback - the queries section above should handle most cases -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" 
+        tools:ignore="QueryAllPackagesPermission" />
+    
+    <!-- Package visibility queries for Android 11+ (API 30+) -->
+    <!-- This allows the app to see all installed applications for app picker -->
+    <queries>
+        <!-- Query for all apps that can receive notifications -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        
+        <!-- Query for messaging apps -->
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="text/plain" />
+        </intent>
+        
+        <!-- Query for apps that handle notifications -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="content" />
+        </intent>
+        
+        <!-- Specific popular apps for better compatibility -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.facebook.orca" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.facebook.katana" />
+        <package android:name="com.twitter.android" />
+        <package android:name="com.google.android.apps.messaging" />
+        <package android:name="com.slack" />
+        <package android:name="com.discord" />
+        <package android:name="com.skype.raider" />
+        <package android:name="com.viber.voip" />
+        <package android:name="com.google.android.talk" />
+        <package android:name="com.microsoft.teams" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="com.snapchat.android" />
+        <package android:name="com.linkedin.android" />
+        <package android:name="com.pinterest" />
+        <package android:name="com.reddit.frontpage" />
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.netflix.mediaclient" />
+        <package android:name="com.amazon.mShop.android.shopping" />
+        <package android:name="com.paypal.android.p2pmobile" />
+        <package android:name="com.ubercab" />
+        <package android:name="com.airbnb.android" />
+    </queries>
 
     <application
         android:name=".SmsForwarderApplication"
@@ -90,6 +151,17 @@
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- Notification Router Service -->
+        <service
+            android:name=".data.service.NotifRouterService"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
 
     </application>
 

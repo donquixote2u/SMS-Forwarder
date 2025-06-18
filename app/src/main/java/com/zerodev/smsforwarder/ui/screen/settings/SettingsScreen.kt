@@ -1,31 +1,44 @@
 package com.zerodev.smsforwarder.ui.screen.settings
 
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.zerodev.smsforwarder.data.service.NotifRouterService
+import com.zerodev.smsforwarder.data.repository.AppRepository
 
 /**
  * Settings screen for permissions and app configuration.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    appRepository: AppRepository = hiltViewModel<SettingsViewModel>().appRepository
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
     val permissionsToRequest = mutableListOf(
         Manifest.permission.RECEIVE_SMS,
         Manifest.permission.READ_SMS
@@ -39,6 +52,16 @@ fun SettingsScreen() {
     val permissionsState = rememberMultiplePermissionsState(
         permissions = permissionsToRequest
     )
+    
+    // Check if notification listener is enabled
+    val isNotificationListenerEnabled = remember(context) {
+        NotifRouterService.isServiceEnabled(context)
+    }
+    
+    val openNotificationListenerSettings = {
+        val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+        context.startActivity(intent)
+    }
     
     Scaffold(
         topBar = {
@@ -97,6 +120,16 @@ fun SettingsScreen() {
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     PermissionItem(
+                        title = "Notification Access",
+                        description = "Required to capture and forward notifications from other apps",
+                        icon = Icons.Default.Notifications,
+                        isGranted = isNotificationListenerEnabled,
+                        onRequest = openNotificationListenerSettings
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    PermissionItem(
                         title = "Internet Access",
                         description = "Required to forward SMS to HTTP endpoints",
                         icon = Icons.Default.Star,
@@ -123,30 +156,65 @@ fun SettingsScreen() {
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     Text(
-                        text = "To test SMS forwarding:",
+                        text = "To test SMS and notification forwarding:",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
+                        text = "SMS Testing:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
                         text = "1. Ensure SMS permissions are granted above",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        text = "2. Create a forwarding rule in the Rules tab",
+                        text = "2. Create an SMS forwarding rule in the Rules tab",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
                         text = "3. Send an SMS to your phone (from another phone)",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
                     Text(
-                        text = "4. Check the History tab - ALL received SMS will appear there",
+                        text = "Notification Testing:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = "1. Ensure Notification Access is granted above",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        text = "5. Check logcat for detailed logs (tag: SmsReceiver, SmsForwardingService)",
+                        text = "2. Create a notification forwarding rule in the Rules tab",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "3. Receive a notification from any app (WhatsApp, email, etc.)",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "General:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "4. Check the History tab - ALL messages/notifications will appear there",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        text = "5. Check logcat for detailed logs (tag: SmsReceiver, NotifRouterService)",
                         style = MaterialTheme.typography.bodySmall
                     )
                     
@@ -157,7 +225,7 @@ fun SettingsScreen() {
                         shape = MaterialTheme.shapes.small
                     ) {
                         Text(
-                            text = "💡 Tip: The History tab now shows ALL received SMS messages, even ones that don't match any rules. This helps debug if SMS are being received at all.",
+                            text = "💡 Tip: The History tab now shows ALL received SMS messages and notifications, even ones that don't match any rules. This helps debug if messages are being received at all.",
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(12.dp)
                         )
@@ -186,6 +254,69 @@ fun SettingsScreen() {
                     InfoRow("Target SDK", "34 (Android 14)")
                     InfoRow("Min SDK", "29 (Android 10)")
                 }
+            }
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            // Debug Section (always available for troubleshooting)
+            run {
+                var debugInfo by remember { mutableStateOf("") }
+                var showDebugDialog by remember { mutableStateOf(false) }
+                
+                Text(
+                    text = "Debug Information",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            try {
+                                debugInfo = appRepository.debugAppVisibility()
+                                showDebugDialog = true
+                            } catch (e: Exception) {
+                                debugInfo = "Debug failed: ${e.message}"
+                                showDebugDialog = true
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Test App Visibility")
+                }
+                
+                if (showDebugDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDebugDialog = false },
+                        title = { Text("App Visibility Debug") },
+                        text = {
+                            Text(
+                                text = debugInfo,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showDebugDialog = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "If app search isn't working:\n" +
+                            "1. Check notification access is enabled\n" +
+                            "2. Try restarting the app\n" +
+                            "3. On Android 11+, some apps may not be visible due to privacy restrictions",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

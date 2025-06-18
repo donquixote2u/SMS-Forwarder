@@ -19,13 +19,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
-        // Room database export schema
-        kapt {
-            arguments {
-                arg("room.schemaLocation", "$projectDir/schemas")
-            }
-        }
     }
 
     buildTypes {
@@ -46,9 +39,21 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
+    }
+}
+
+// KAPT configuration
+kapt {
+    correctErrorTypes = true
+    arguments {
+        arg("room.schemaLocation", "${project.projectDir}/schemas".toString())
+        arg("room.incremental", "true")
+        arg("room.expandProjection", "true")
+        arg("kapt.kotlin.generated", "${project.layout.buildDirectory.get()}/generated/source/kapt/main".toString())
     }
 }
 

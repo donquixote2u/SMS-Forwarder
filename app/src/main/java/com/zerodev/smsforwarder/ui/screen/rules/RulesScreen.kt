@@ -28,7 +28,7 @@ fun RulesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("SMS Forwarding Rules") }
+                title = { Text("Forwarding Rules") }
             )
         },
         floatingActionButton = {
@@ -91,7 +91,7 @@ fun RulesScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Tap the + button to create your first SMS forwarding rule",
+                                text = "Tap the + button to create your first forwarding rule for SMS or notifications",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -157,9 +157,27 @@ private fun RuleItem(
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
+                text = "Source: ${rule.source.name}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
                 text = "Pattern: ${rule.pattern}",
                 style = MaterialTheme.typography.bodyMedium
             )
+            if (rule.source.name == "NOTIFICATION" && rule.packageFilter != null) {
+                Text(
+                    text = "App: ${rule.packageFilter}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            } else if (rule.source.name == "NOTIFICATION") {
+                Text(
+                    text = "App: All apps",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
             Text(
                 text = "Endpoint: ${rule.endpoint}",
                 style = MaterialTheme.typography.bodySmall,

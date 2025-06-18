@@ -173,7 +173,7 @@ private fun HistoryItem(
             ) {
                 Column {
                     Text(
-                        text = if (historyEntry.matchedRule) "Rule: ${historyEntry.ruleName}" else "No Rule Matched",
+                        text = if (historyEntry.matchedRule) "Rule Matched" else "No Rule Matched",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (historyEntry.matchedRule) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -197,16 +197,30 @@ private fun HistoryItem(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            Text(
-                text = "SMS: \"${historyEntry.smsMessage.getTruncatedBody(60)}\"",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "From: ${historyEntry.smsMessage.getMaskedSender()}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Display content based on source type
+            if (historyEntry.isSms()) {
+                Text(
+                    text = "SMS: \"${historyEntry.getContentPreview(60)}\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "From: ${historyEntry.senderNumber ?: "Unknown"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = "Notification: \"${historyEntry.getContentPreview(60)}\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "From: ${historyEntry.sourceAppName ?: historyEntry.sourcePackage ?: "Unknown App"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             
             if (historyEntry.responseCode != null) {
                 Text(
@@ -227,7 +241,7 @@ private fun HistoryItem(
             Spacer(modifier = Modifier.height(4.dp))
             
             Text(
-                text = historyEntry.createdAt.toString(),
+                text = historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -305,7 +319,7 @@ private fun HistoryDetailDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "SMS Details",
+                            text = if (historyEntry.isSms()) "SMS Details" else "Notification Details",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -343,29 +357,48 @@ private fun HistoryDetailDialog(
                     }
                 }
                 
-                // SMS Information
-                DetailSection(title = "SMS Information") {
-                    DetailRow("From", historyEntry.smsMessage.sender)
-                    DetailRow("Content", historyEntry.smsMessage.body)
-                    DetailRow(
-                        "Received", 
-                        historyEntry.smsMessage.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString()
-                    )
+                // SMS/Notification Information
+                if (historyEntry.isSms()) {
+                    DetailSection(title = "SMS Information") {
+                        DetailRow("From", historyEntry.senderNumber ?: "Unknown")
+                        DetailRow("Content", historyEntry.messageBody)
+                        DetailRow(
+                            "Received", 
+                            historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString()
+                        )
+                    }
+                } else {
+                    DetailSection(title = "Notification Information") {
+                        DetailRow("App", historyEntry.sourceAppName ?: historyEntry.sourcePackage ?: "Unknown")
+                        historyEntry.notificationTitle?.let { title ->
+                            DetailRow("Title", title)
+                        }
+                        DetailRow("Content", historyEntry.notificationText ?: historyEntry.messageBody)
+                        DetailRow(
+                            "Received", 
+                            historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString()
+                        )
+                    }
                 }
                 
                 // Rule Information
                 if (historyEntry.matchedRule) {
                     DetailSection(title = "Rule Information") {
-                        DetailRow("Rule Name", historyEntry.ruleName)
                         if (historyEntry.ruleId != null) {
                             DetailRow("Rule ID", historyEntry.ruleId.toString())
+                        }
+                        historyEntry.endpoint?.let { endpoint ->
+                            DetailRow("Endpoint", endpoint)
+                        }
+                        historyEntry.method?.let { method ->
+                            DetailRow("HTTP Method", method)
                         }
                     }
                     
                     // Request Information
-                    if (historyEntry.requestPayload != null) {
+                    if (historyEntry.requestBody != null) {
                         DetailSection(title = "Request Information") {
-                            DetailRow("Payload", historyEntry.requestPayload, isCode = true)
+                            DetailRow("Payload", historyEntry.requestBody, isCode = true)
                         }
                     }
                     
@@ -399,7 +432,7 @@ private fun HistoryDetailDialog(
                 DetailSection(title = "Timestamps") {
                     DetailRow(
                         "Processed At", 
-                        historyEntry.createdAt.toLocalDateTime(TimeZone.currentSystemDefault()).toString()
+                        historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString()
                     )
                 }
             }

@@ -1,7 +1,7 @@
 package com.zerodev.smsforwarder.data.local.converter
 
 import androidx.room.TypeConverter
-import com.zerodev.smsforwarder.data.local.entity.ForwardingStatus
+import com.zerodev.smsforwarder.domain.model.ForwardingStatus
 import kotlinx.datetime.Instant
 
 /**
@@ -10,19 +10,19 @@ import kotlinx.datetime.Instant
 class Converters {
     
     /**
-     * Convert Instant to Long for database storage.
+     * Convert Instant to Long for database storage (milliseconds).
      */
     @TypeConverter
     fun fromInstant(instant: Instant): Long {
-        return instant.epochSeconds
+        return instant.toEpochMilliseconds()
     }
     
     /**
-     * Convert Long to Instant from database.
+     * Convert Long to Instant from database (milliseconds).
      */
     @TypeConverter
-    fun toInstant(epochSeconds: Long): Instant {
-        return Instant.fromEpochSeconds(epochSeconds)
+    fun toInstant(epochMilliseconds: Long): Instant {
+        return Instant.fromEpochMilliseconds(epochMilliseconds)
     }
     
     /**
