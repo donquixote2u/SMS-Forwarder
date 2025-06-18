@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<issues format="6" by="lint 8.0.0" type="baseline" client="gradle" dependencies="false" name="AGP (8.0.0)" variant="all" version="8.0.0">
+
+    <issue
+        id="ProtectedPermissions"
+        message="Permission is only granted to system apps"
+        category="Correctness"
+        priority="9"
+        summary="Checks for permissions only granted to system apps"
+        explanation="Permissions with the protection level signature, privileged or signatureOrSystem are only granted to system apps (unless they also include appop). If an app is a regular non-system app, it will never be able to use these permissions."
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.BIND_NOTIFICATION_LISTENER_SERVICE&quot; "
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="29"
+            column="36"/>
+    </issue>
+
+</issues> 

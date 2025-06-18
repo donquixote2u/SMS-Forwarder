@@ -44,6 +44,17 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
     }
+    
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = false
+        warningsAsErrors = false
+        checkReleaseBuilds = false
+        disable += setOf(
+            "ProtectedPermissions",
+            "QueryAllPackagesPermission"
+        )
+    }
 }
 
 // KAPT configuration

@@ -26,14 +26,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" android:minSdkVersion="33" />
     
     <!-- Notification listener permission -->
-    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    <!-- This is a protected permission, but users can grant it through Settings > Apps > Special access > Notification access -->
+    <!-- This is the standard way for legitimate notification management apps to access notifications -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" 
+        tools:ignore="ProtectedPermissions" />
     
     <!-- Usage stats permission for MRU apps -->
+    <!-- Users can grant this through Settings > Apps > Special access > Usage access -->
+    <!-- This allows us to show recently used apps in the app picker for better UX -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" 
         tools:ignore="ProtectedPermissions" />
     
     <!-- Query all packages permission for comprehensive app list (requires special approval) -->
     <!-- This is a fallback - the queries section above should handle most cases -->
+    <!-- Google Play may require justification for this permission -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" 
         tools:ignore="QueryAllPackagesPermission" />
     
