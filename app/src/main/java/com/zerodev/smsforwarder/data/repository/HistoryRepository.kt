@@ -196,6 +196,80 @@ class HistoryRepository @Inject constructor(
     suspend fun deleteHistoryById(id: Long) {
         historyDao.deleteHistoryById(id)
     }
+    
+    /**
+     * Search history entries with fuzzy search.
+     * @param searchQuery The search query
+     * @param page Page number (0-based)
+     * @param pageSize Number of items per page
+     * @return Flow of matching history entries
+     */
+    fun searchHistoryPaginated(searchQuery: String, page: Int, pageSize: Int): Flow<List<ForwardingHistory>> {
+        val offset = page * pageSize
+        return historyDao.searchHistoryPaginated(searchQuery, pageSize, offset).map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    /**
+     * Filter history entries by app.
+     * @param appFilter The app package name or app name to filter by
+     * @param page Page number (0-based)
+     * @param pageSize Number of items per page
+     * @return Flow of filtered history entries
+     */
+    fun filterByAppPaginated(appFilter: String, page: Int, pageSize: Int): Flow<List<ForwardingHistory>> {
+        val offset = page * pageSize
+        return historyDao.filterByAppPaginated(appFilter, pageSize, offset).map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    /**
+     * Filter history entries by pattern.
+     * @param pattern The pattern to search for in message content
+     * @param page Page number (0-based)
+     * @param pageSize Number of items per page
+     * @return Flow of filtered history entries
+     */
+    fun filterByPatternPaginated(pattern: String, page: Int, pageSize: Int): Flow<List<ForwardingHistory>> {
+        val offset = page * pageSize
+        return historyDao.filterByPatternPaginated(pattern, pageSize, offset).map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    /**
+     * Get distinct apps from history for filter dropdown.
+     * @return List of distinct app information
+     */
+    suspend fun getDistinctApps(): List<com.zerodev.smsforwarder.data.local.dao.AppInfo> {
+        return historyDao.getDistinctApps()
+    }
+    
+    /**
+     * Filter history with combined filters (search, app, pattern).
+     * @param searchQuery Optional search query (empty string if not filtering)
+     * @param appFilter Optional app filter (empty string if not filtering)
+     * @param patternFilter Optional pattern filter (empty string if not filtering)
+     * @param page Page number (0-based)
+     * @param pageSize Number of items per page
+     * @return Flow of filtered history entries
+     */
+    fun filterHistoryPaginated(
+        searchQuery: String,
+        appFilter: String,
+        patternFilter: String,
+        page: Int,
+        pageSize: Int
+    ): Flow<List<ForwardingHistory>> {
+        val offset = page * pageSize
+        return historyDao.filterHistoryPaginated(
+            searchQuery, appFilter, patternFilter, pageSize, offset
+        ).map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
 }
 
 /**

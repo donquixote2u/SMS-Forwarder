@@ -5,16 +5,19 @@ import androidx.lifecycle.viewModelScope
 import com.zerodev.smsforwarder.domain.model.ForwardingStatus
 import com.zerodev.smsforwarder.domain.model.ForwardingHistory
 import com.zerodev.smsforwarder.data.repository.HistoryRepository
+import com.zerodev.smsforwarder.data.local.dao.AppInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 /**
- * ViewModel for the history screen with pagination and delete support.
+ * ViewModel for the history screen with pagination, delete, and filter support.
  */
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
@@ -23,6 +26,7 @@ class HistoryViewModel @Inject constructor(
     
     companion object {
         private const val PAGE_SIZE = 15
+        private const val SEARCH_DELAY_MS = 300L // Debounce search input
     }
     
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -30,14 +34,21 @@ class HistoryViewModel @Inject constructor(
     
     private var currentPage = 0
     private var allHistoryLoaded = false
+    private var searchJob: Job? = null
+    
+    // Filter states
+    private var currentSearchQuery = ""
+    private var currentAppFilter = ""
+    private var currentPatternFilter = ""
     
     init {
         loadFirstPage()
         loadStatistics()
+        loadDistinctApps()
     }
     
     /**
-     * Load the first page of history.
+     * Load the first page of history with current filters.
      */
     private fun loadFirstPage() {
         currentPage = 0
@@ -70,11 +81,77 @@ class HistoryViewModel @Inject constructor(
     }
     
     /**
-     * Load a specific page of history.
+     * Update search query with debounce.
+     */
+    fun updateSearchQuery(query: String) {
+        currentSearchQuery = query
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+        
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DELAY_MS)
+            applyFilters()
+        }
+    }
+    
+    /**
+     * Update app filter.
+     */
+    fun updateAppFilter(appFilter: String) {
+        currentAppFilter = appFilter
+        _uiState.value = _uiState.value.copy(selectedApp = appFilter)
+        applyFilters()
+    }
+    
+    /**
+     * Update pattern filter.
+     */
+    fun updatePatternFilter(pattern: String) {
+        currentPatternFilter = pattern
+        _uiState.value = _uiState.value.copy(patternFilter = pattern)
+        applyFilters()
+    }
+    
+    /**
+     * Clear all filters.
+     */
+    fun clearFilters() {
+        currentSearchQuery = ""
+        currentAppFilter = ""
+        currentPatternFilter = ""
+        _uiState.value = _uiState.value.copy(
+            searchQuery = "",
+            selectedApp = "",
+            patternFilter = ""
+        )
+        applyFilters()
+    }
+    
+    /**
+     * Apply current filters and reload data.
+     */
+    private fun applyFilters() {
+        loadFirstPage()
+    }
+    
+    /**
+     * Load a specific page of history with current filters.
      */
     private fun loadHistoryPage() {
         viewModelScope.launch {
-            historyRepository.getHistoryPaginated(currentPage, PAGE_SIZE)
+            val historyFlow = if (hasActiveFilters()) {
+                historyRepository.filterHistoryPaginated(
+                    searchQuery = currentSearchQuery,
+                    appFilter = currentAppFilter,
+                    patternFilter = currentPatternFilter,
+                    page = currentPage,
+                    pageSize = PAGE_SIZE
+                )
+            } else {
+                historyRepository.getHistoryPaginated(currentPage, PAGE_SIZE)
+            }
+            
+            historyFlow
                 .catch { error ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -104,6 +181,29 @@ class HistoryViewModel @Inject constructor(
                         error = null
                     )
                 }
+        }
+    }
+    
+    /**
+     * Check if any filters are currently active.
+     */
+    private fun hasActiveFilters(): Boolean {
+        return currentSearchQuery.isNotEmpty() || 
+               currentAppFilter.isNotEmpty() || 
+               currentPatternFilter.isNotEmpty()
+    }
+    
+    /**
+     * Load distinct apps for the filter dropdown.
+     */
+    private fun loadDistinctApps() {
+        viewModelScope.launch {
+            try {
+                val apps = historyRepository.getDistinctApps()
+                _uiState.value = _uiState.value.copy(availableApps = apps)
+            } catch (e: Exception) {
+                // Apps loading is not critical, so we don't show error
+            }
         }
     }
     

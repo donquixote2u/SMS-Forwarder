@@ -7,17 +7,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 
@@ -26,9 +27,18 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.zerodev.smsforwarder.domain.model.ForwardingHistory
 import com.zerodev.smsforwarder.domain.model.StatusColor
+import com.zerodev.smsforwarder.data.local.dao.AppInfo
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
+/**
+ * Check if any filters are currently active.
+ */
+private fun hasActiveFilters(uiState: HistoryUiState): Boolean {
+    return uiState.searchQuery.isNotEmpty() || 
+           uiState.selectedApp.isNotEmpty() || 
+           uiState.patternFilter.isNotEmpty()
+}
 
 /**
  * Screen for viewing SMS forwarding history with pagination and delete functionality.
@@ -41,6 +51,7 @@ fun HistoryScreen(
     val uiState by viewModel.uiState.collectAsState()
     var selectedHistoryEntry by remember { mutableStateOf<ForwardingHistory?>(null) }
     var showClearAllDialog by remember { mutableStateOf(false) }
+    var showFilterDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     
     Scaffold(
@@ -48,6 +59,14 @@ fun HistoryScreen(
             TopAppBar(
                 title = { Text("Forwarding History") },
                 actions = {
+                    IconButton(onClick = { showFilterDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Filter",
+                            tint = if (hasActiveFilters(uiState)) MaterialTheme.colorScheme.primary 
+                                  else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     IconButton(onClick = { viewModel.refreshHistory() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -72,6 +91,26 @@ fun HistoryScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
+            // Search Bar
+            SearchBar(
+                query = uiState.searchQuery,
+                onQueryChange = viewModel::updateSearchQuery,
+                onClearSearch = { viewModel.updateSearchQuery("") }
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Active Filters Display
+            if (hasActiveFilters(uiState)) {
+                ActiveFiltersRow(
+                    uiState = uiState,
+                    onClearFilters = viewModel::clearFilters,
+                    onRemoveAppFilter = { viewModel.updateAppFilter("") },
+                    onRemovePatternFilter = { viewModel.updatePatternFilter("") }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            
             // Statistics Card
             Card(
                 modifier = Modifier.fillMaxWidth()
@@ -204,6 +243,17 @@ fun HistoryScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+    
+    // Filter Dialog
+    if (showFilterDialog) {
+        FilterDialog(
+            uiState = uiState,
+            onDismiss = { showFilterDialog = false },
+            onApplyAppFilter = viewModel::updateAppFilter,
+            onApplyPatternFilter = viewModel::updatePatternFilter,
+            onClearFilters = viewModel::clearFilters
         )
     }
     
@@ -660,5 +710,254 @@ data class HistoryUiState(
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val hasMorePages: Boolean = true,
-    val error: String? = null
-) 
+    val error: String? = null,
+    // Filter-related states
+    val searchQuery: String = "",
+    val selectedApp: String = "",
+    val patternFilter: String = "",
+    val availableApps: List<AppInfo> = emptyList(),
+    val showFilterDialog: Boolean = false
+)
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClearSearch: () -> Unit
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("Search apps, content, numbers...") },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search"
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = onClearSearch) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = "Clear search"
+                    )
+                }
+            }
+        },
+        singleLine = true
+    )
+}
+
+@Composable
+private fun ActiveFiltersRow(
+    uiState: HistoryUiState,
+    onClearFilters: () -> Unit,
+    onRemoveAppFilter: () -> Unit,
+    onRemovePatternFilter: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Filters:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        
+        if (uiState.selectedApp.isNotEmpty()) {
+            FilterChip(
+                selected = true,
+                onClick = onRemoveAppFilter,
+                label = { 
+                    Text(
+                        text = "App: ${uiState.selectedApp}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    ) 
+                },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Remove app filter",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            )
+        }
+        
+        if (uiState.patternFilter.isNotEmpty()) {
+            FilterChip(
+                selected = true,
+                onClick = onRemovePatternFilter,
+                label = { 
+                    Text(
+                        text = "Pattern: ${uiState.patternFilter}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    ) 
+                },
+                trailingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Remove pattern filter",
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            )
+        }
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        TextButton(onClick = onClearFilters) {
+            Text("Clear All")
+        }
+    }
+}
+
+@Composable
+private fun FilterDialog(
+    uiState: HistoryUiState,
+    onDismiss: () -> Unit,
+    onApplyAppFilter: (String) -> Unit,
+    onApplyPatternFilter: (String) -> Unit,
+    onClearFilters: () -> Unit
+) {
+    var selectedApp by remember { mutableStateOf(uiState.selectedApp) }
+    var patternText by remember { mutableStateOf(uiState.patternFilter) }
+    var expandedApp by remember { mutableStateOf(false) }
+    
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Filter History",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close"
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // App Filter
+                Text(
+                    text = "Filter by App",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Box {
+                    OutlinedTextField(
+                        value = selectedApp.ifEmpty { "All Apps" },
+                        onValueChange = { },
+                        readOnly = true,
+                        placeholder = { Text("Select an app") },
+                        trailingIcon = {
+                            IconButton(onClick = { expandedApp = !expandedApp }) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Dropdown"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    DropdownMenu(
+                        expanded = expandedApp,
+                        onDismissRequest = { expandedApp = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("All Apps") },
+                            onClick = {
+                                selectedApp = ""
+                                expandedApp = false
+                            }
+                        )
+                        
+                        uiState.availableApps.forEach { app ->
+                            DropdownMenuItem(
+                                text = { Text(app.app_name) },
+                                onClick = {
+                                    selectedApp = app.app_name
+                                    expandedApp = false
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Pattern Filter
+                Text(
+                    text = "Filter by Pattern",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                OutlinedTextField(
+                    value = patternText,
+                    onValueChange = { patternText = it },
+                    placeholder = { Text("Enter pattern to search in content") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            onClearFilters()
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Clear All")
+                    }
+                    
+                    Button(
+                        onClick = {
+                            onApplyAppFilter(selectedApp)
+                            onApplyPatternFilter(patternText)
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Apply")
+                    }
+                }
+            }
+        }
+    }
+} 

@@ -168,4 +168,111 @@ interface HistoryDao {
      */
     @Query("DELETE FROM forwarding_history WHERE id = :id")
     suspend fun deleteHistoryById(id: Long)
-} 
+    
+    /**
+     * Search history entries with fuzzy search (combines app, title, content).
+     * @param searchQuery The search query
+     * @param limit Number of items per page
+     * @param offset Offset for pagination
+     * @return Flow of matching history entries
+     */
+    @Query("""
+        SELECT * FROM forwarding_history 
+        WHERE (source_app_name LIKE '%' || :searchQuery || '%' OR
+               source_package LIKE '%' || :searchQuery || '%' OR
+               notification_title LIKE '%' || :searchQuery || '%' OR
+               message_body LIKE '%' || :searchQuery || '%' OR
+               sender_number LIKE '%' || :searchQuery || '%')
+        ORDER BY timestamp DESC 
+        LIMIT :limit OFFSET :offset
+    """)
+    fun searchHistoryPaginated(searchQuery: String, limit: Int, offset: Int): Flow<List<HistoryEntity>>
+    
+    /**
+     * Filter history entries by app (source package or app name).
+     * @param appFilter The app package name or app name to filter by
+     * @param limit Number of items per page
+     * @param offset Offset for pagination
+     * @return Flow of filtered history entries
+     */
+    @Query("""
+        SELECT * FROM forwarding_history 
+        WHERE (source_package = :appFilter OR source_app_name = :appFilter)
+        ORDER BY timestamp DESC 
+        LIMIT :limit OFFSET :offset
+    """)
+    fun filterByAppPaginated(appFilter: String, limit: Int, offset: Int): Flow<List<HistoryEntity>>
+    
+    /**
+     * Filter history entries by pattern (message content or notification text).
+     * @param pattern The pattern to search for in message content
+     * @param limit Number of items per page
+     * @param offset Offset for pagination
+     * @return Flow of filtered history entries
+     */
+    @Query("""
+        SELECT * FROM forwarding_history 
+        WHERE (message_body LIKE '%' || :pattern || '%' OR
+               notification_title LIKE '%' || :pattern || '%' OR
+               notification_text LIKE '%' || :pattern || '%')
+        ORDER BY timestamp DESC 
+        LIMIT :limit OFFSET :offset
+    """)
+    fun filterByPatternPaginated(pattern: String, limit: Int, offset: Int): Flow<List<HistoryEntity>>
+    
+    /**
+     * Get distinct apps from history for filter dropdown.
+     * @return List of distinct app names and packages
+     */
+    @Query("""
+        SELECT DISTINCT 
+            COALESCE(source_app_name, source_package, 'Unknown') as app_name,
+            source_package
+        FROM forwarding_history 
+        WHERE source_package IS NOT NULL OR source_app_name IS NOT NULL
+        ORDER BY app_name
+    """)
+    suspend fun getDistinctApps(): List<AppInfo>
+    
+    /**
+     * Combined filter with search, app filter, and pattern filter.
+     * @param searchQuery Optional search query (use empty string if not filtering)
+     * @param appFilter Optional app filter (use empty string if not filtering)  
+     * @param patternFilter Optional pattern filter (use empty string if not filtering)
+     * @param limit Number of items per page
+     * @param offset Offset for pagination
+     * @return Flow of filtered history entries
+     */
+    @Query("""
+        SELECT * FROM forwarding_history 
+        WHERE (:searchQuery = '' OR 
+               source_app_name LIKE '%' || :searchQuery || '%' OR
+               source_package LIKE '%' || :searchQuery || '%' OR
+               notification_title LIKE '%' || :searchQuery || '%' OR
+               message_body LIKE '%' || :searchQuery || '%' OR
+               sender_number LIKE '%' || :searchQuery || '%') AND
+              (:appFilter = '' OR 
+               source_package = :appFilter OR source_app_name = :appFilter) AND
+              (:patternFilter = '' OR
+               message_body LIKE '%' || :patternFilter || '%' OR
+               notification_title LIKE '%' || :patternFilter || '%' OR
+               notification_text LIKE '%' || :patternFilter || '%')
+        ORDER BY timestamp DESC 
+        LIMIT :limit OFFSET :offset
+    """)
+    fun filterHistoryPaginated(
+        searchQuery: String,
+        appFilter: String, 
+        patternFilter: String,
+        limit: Int, 
+        offset: Int
+    ): Flow<List<HistoryEntity>>
+}
+
+/**
+ * Data class for app information used in filters.
+ */
+data class AppInfo(
+    val app_name: String,
+    val source_package: String?
+) 
