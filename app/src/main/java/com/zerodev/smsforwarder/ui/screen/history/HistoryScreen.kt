@@ -4,17 +4,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -23,8 +29,9 @@ import com.zerodev.smsforwarder.domain.model.StatusColor
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 
+
 /**
- * Screen for viewing SMS forwarding history.
+ * Screen for viewing SMS forwarding history with pagination and delete functionality.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,11 +40,29 @@ fun HistoryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedHistoryEntry by remember { mutableStateOf<ForwardingHistory?>(null) }
+    var showClearAllDialog by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Forwarding History") }
+                title = { Text("Forwarding History") },
+                actions = {
+                    IconButton(onClick = { viewModel.refreshHistory() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh"
+                        )
+                    }
+                    if (uiState.history.isNotEmpty()) {
+                        IconButton(onClick = { showClearAllDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Clear All"
+                            )
+                        }
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -64,7 +89,7 @@ fun HistoryScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        StatisticItem("Total SMS", uiState.totalCount.toString())
+                        StatisticItem("Total", uiState.totalCount.toString())
                         StatisticItem("Matched", uiState.matchedCount.toString())
                         StatisticItem("Success", uiState.successCount.toString())
                         StatisticItem("Failed", uiState.failedCount.toString())
@@ -75,7 +100,7 @@ fun HistoryScreen(
             Spacer(modifier = Modifier.height(16.dp))
             
             // History List
-            if (uiState.isLoading) {
+            if (uiState.isLoading && uiState.history.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
@@ -96,12 +121,12 @@ fun HistoryScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "No SMS Messages Yet",
+                                text = "No Messages Yet",
                                 style = MaterialTheme.typography.headlineSmall
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Received SMS messages will appear here for debugging.\nSend an SMS to your phone to test.",
+                                text = "SMS messages and notifications will appear here.\nSend an SMS or trigger a notification to test.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -110,13 +135,40 @@ fun HistoryScreen(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(uiState.history) { historyEntry ->
-                        HistoryItem(
+                    items(
+                        items = uiState.history,
+                        key = { it.id }
+                    ) { historyEntry ->
+                        SwipeToDeleteHistoryItem(
                             historyEntry = historyEntry,
+                            onDelete = { viewModel.deleteHistoryEntry(historyEntry.id) },
                             onClick = { selectedHistoryEntry = historyEntry }
                         )
+                    }
+                    
+                    // Load more button
+                    if (uiState.hasMorePages) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (uiState.isLoadingMore) {
+                                    CircularProgressIndicator()
+                                } else {
+                                    Button(
+                                        onClick = { viewModel.loadNextPage() }
+                                    ) {
+                                        Text("Load More")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -129,6 +181,38 @@ fun HistoryScreen(
             historyEntry = historyEntry,
             onDismiss = { selectedHistoryEntry = null }
         )
+    }
+    
+    // Clear all confirmation dialog
+    if (showClearAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearAllDialog = false },
+            title = { Text("Clear All History") },
+            text = { Text("Are you sure you want to delete all history entries? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearAllHistory()
+                        showClearAllDialog = false
+                    }
+                ) {
+                    Text("Delete All")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearAllDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    // Show error snackbar if needed
+    uiState.error?.let { error ->
+        LaunchedEffect(error) {
+            // Error handling could be improved with SnackbarHost
+            viewModel.clearError()
+        }
     }
 }
 
@@ -153,9 +237,11 @@ private fun StatisticItem(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HistoryItem(
+private fun SwipeToDeleteHistoryItem(
     historyEntry: ForwardingHistory,
+    onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
     Card(
@@ -163,15 +249,34 @@ private fun HistoryItem(
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
+        HistoryItemContent(
+            historyEntry = historyEntry,
+            onDelete = onDelete
+        )
+    }
+}
+
+@Composable
+private fun HistoryItemContent(
+    historyEntry: ForwardingHistory,
+    onDelete: (() -> Unit)? = null
+) {
+    Box(
+        modifier = Modifier.fillMaxWidth()
+    ) {
         Column(
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
                         text = if (historyEntry.matchedRule) "Rule Matched" else "No Rule Matched",
                         style = MaterialTheme.typography.titleMedium,
@@ -192,6 +297,7 @@ private fun HistoryItem(
                         )
                     }
                 }
+                
                 StatusChip(historyEntry = historyEntry)
             }
             
@@ -238,14 +344,54 @@ private fun HistoryItem(
                 )
             }
             
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
-            Text(
-                text = historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Bottom row with timestamp and delete button space
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Space for delete button positioned at bottom right
+                if (onDelete != null) {
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    // Add invisible spacer when no delete button to maintain consistent layout
+                    Spacer(modifier = Modifier.size(32.dp))
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun HistoryItem(
+    historyEntry: ForwardingHistory,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+    ) {
+        HistoryItemContent(historyEntry = historyEntry)
     }
 }
 
@@ -512,5 +658,7 @@ data class HistoryUiState(
     val successCount: Int = 0,
     val failedCount: Int = 0,
     val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasMorePages: Boolean = true,
     val error: String? = null
 ) 

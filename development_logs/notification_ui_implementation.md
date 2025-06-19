@@ -333,4 +333,63 @@ val rule = Rule(
 ✅ **Clear user instructions and testing guidance**
 ✅ **Resolved build configuration warnings**
 
-The app now provides a complete user interface for managing both SMS and notification forwarding rules, with proper permission handling and clear user guidance. 
+The app now provides a complete user interface for managing both SMS and notification forwarding rules, with proper permission handling and clear user guidance.
+
+# Notification UI Implementation Log
+
+This document tracks the implementation of notification system UI components.
+
+## Implementation Log
+
+### History Screen Pagination and Delete Functionality (2024-01-XX)
+
+**Features Implemented**:
+- **Pagination**: History loads in pages of 15 items instead of loading all at once
+- **Visible delete buttons**: Each history item shows a delete button for easy access
+- **Delete functionality**: Individual delete and "Clear All" options
+- **Load more**: Button to load additional pages when available
+- **Improved UI**: Better statistics display and modern Material 3 design
+
+**Technical Details**:
+
+1. **Database Layer Updates**:
+   - Added `getHistoryPaginated(limit: Int, offset: Int)` to `HistoryDao`
+   - Added `deleteHistoryById(id: Long)` to `HistoryDao`
+
+2. **Repository Layer**:
+   - Added `getHistoryPaginated(page: Int, pageSize: Int)` to `HistoryRepository`
+   - Added `deleteHistoryById(id: Long)` to `HistoryRepository`
+
+3. **ViewModel Updates**:
+   - Implemented pagination logic with `PAGE_SIZE = 15`
+   - Added `loadNextPage()`, `refreshHistory()`, `deleteHistoryEntry()`, `clearAllHistory()`
+   - Added `isLoadingMore` and `hasMorePages` states
+   - Automatic loading of next page when items are deleted and list becomes too short
+
+4. **UI Components**:
+   - **Delete buttons**: Each history item displays a delete button with error color
+   - **Responsive layout**: Delete button positioned next to status chip
+   - **Load more button** with loading state
+   - **Refresh and clear all buttons** in top app bar
+   - **Confirmation dialog** for "Clear All" action
+   - **Simplified detail dialog** focused on viewing information
+
+**User Experience Improvements**:
+- **Performance**: Only loads 15 items at a time, reducing memory usage
+- **Direct Access**: Delete buttons are immediately visible on each item
+- **Visual Feedback**: Clear indicators for delete actions with proper error coloring
+- **Safety**: Confirmation dialog prevents accidental bulk deletion
+- **Responsive**: Loading states provide clear feedback
+- **Clean Layout**: Improved spacing and visual hierarchy
+
+**Files Modified**:
+- `app/src/main/java/com/zerodev/smsforwarder/data/local/dao/HistoryDao.kt`
+- `app/src/main/java/com/zerodev/smsforwarder/data/repository/HistoryRepository.kt`
+- `app/src/main/java/com/zerodev/smsforwarder/ui/screen/history/HistoryViewModel.kt`
+- `app/src/main/java/com/zerodev/smsforwarder/ui/screen/history/HistoryScreen.kt`
+
+**Testing Recommendations**:
+- Test pagination with large datasets
+- Verify swipe gestures work across different screen sizes
+- Test delete functionality doesn't break statistics
+- Ensure proper error handling for delete operations 

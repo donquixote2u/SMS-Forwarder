@@ -152,4 +152,20 @@ interface HistoryDao {
      */
     @Query("SELECT COUNT(*) FROM forwarding_history")
     suspend fun getTotalCount(): Int
+    
+    /**
+     * Get history entries with pagination.
+     * @param limit Number of items per page
+     * @param offset Offset for pagination
+     * @return Flow of paginated history entries
+     */
+    @Query("SELECT * FROM forwarding_history ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    fun getHistoryPaginated(limit: Int, offset: Int): Flow<List<HistoryEntity>>
+    
+    /**
+     * Delete a specific history entry by ID.
+     * @param id The history entry ID to delete
+     */
+    @Query("DELETE FROM forwarding_history WHERE id = :id")
+    suspend fun deleteHistoryById(id: Long)
 } 

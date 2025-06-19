@@ -175,6 +175,27 @@ class HistoryRepository @Inject constructor(
             matchedCount = historyDao.getMatchedCount()
         )
     }
+    
+    /**
+     * Get history entries with pagination.
+     * @param page Page number (0-based)
+     * @param pageSize Number of items per page
+     * @return Flow of paginated history entries
+     */
+    fun getHistoryPaginated(page: Int, pageSize: Int): Flow<List<ForwardingHistory>> {
+        val offset = page * pageSize
+        return historyDao.getHistoryPaginated(pageSize, offset).map { entities ->
+            entities.map { entity -> entity.toDomain() }
+        }
+    }
+    
+    /**
+     * Delete a specific history entry by ID.
+     * @param id The history entry ID to delete
+     */
+    suspend fun deleteHistoryById(id: Long) {
+        historyDao.deleteHistoryById(id)
+    }
 }
 
 /**
