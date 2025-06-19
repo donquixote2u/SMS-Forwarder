@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -17,11 +19,18 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -30,6 +39,7 @@ import com.zerodev.smsforwarder.domain.model.StatusColor
 import com.zerodev.smsforwarder.data.local.dao.AppInfo
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.math.roundToInt
 
 /**
  * Check if any filters are currently active.
@@ -287,29 +297,92 @@ private fun StatisticItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDeleteHistoryItem(
     historyEntry: ForwardingHistory,
     onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
+    var offsetX by remember { mutableStateOf(0f) }
+    var itemWidth by remember { mutableStateOf(0) }
+    val density = LocalDensity.current
+    val deleteThreshold = with(density) { 120.dp.toPx() }
+    
+    val backgroundColor by animateFloatAsState(
+        targetValue = if (offsetX < -deleteThreshold * 0.3f) 1f else 0f,
+        animationSpec = tween(200),
+        label = "background_color"
+    )
+    
+    val iconScale by animateFloatAsState(
+        targetValue = if (offsetX < -deleteThreshold * 0.5f) 1.2f else 0.8f,
+        animationSpec = tween(200),
+        label = "icon_scale"
+    )
+
+    Box(
+        modifier = Modifier.fillMaxWidth()
     ) {
-        HistoryItemContent(
-            historyEntry = historyEntry,
-            onDelete = onDelete
-        )
+        // Delete background
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = backgroundColor)
+                ),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            if (backgroundColor > 0.1f) {
+                Row(
+                    modifier = Modifier.padding(end = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.scale(iconScale)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Delete",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        }
+
+        // Main item
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { itemWidth = it.width }
+                .offset { IntOffset(offsetX.roundToInt(), 0) }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (offsetX < -deleteThreshold) {
+                                onDelete()
+                            }
+                            offsetX = 0f
+                        }
+                    ) { _, dragAmount ->
+                        val newOffset = offsetX + dragAmount
+                        offsetX = newOffset.coerceAtMost(0f).coerceAtLeast(-itemWidth * 0.4f)
+                    }
+                }
+                .clickable { onClick() }
+        ) {
+            HistoryItemContent(historyEntry = historyEntry)
+        }
     }
 }
 
 @Composable
 private fun HistoryItemContent(
-    historyEntry: ForwardingHistory,
-    onDelete: (() -> Unit)? = null
+    historyEntry: ForwardingHistory
 ) {
     Box(
         modifier = Modifier.fillMaxWidth()
@@ -396,37 +469,12 @@ private fun HistoryItemContent(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            // Bottom row with timestamp and delete button space
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Text(
-                    text = historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                
-                // Space for delete button positioned at bottom right
-                if (onDelete != null) {
-                    IconButton(
-                        onClick = onDelete,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                } else {
-                    // Add invisible spacer when no delete button to maintain consistent layout
-                    Spacer(modifier = Modifier.size(32.dp))
-                }
-            }
+            // Bottom row with timestamp
+            Text(
+                text = historyEntry.timestamp.toLocalDateTime(TimeZone.currentSystemDefault()).toString(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

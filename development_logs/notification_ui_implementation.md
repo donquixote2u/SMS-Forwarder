@@ -427,4 +427,141 @@ This document tracks the implementation of notification system UI components.
 - `app/src/main/java/com/zerodev/smsforwarder/data/repository/HistoryRepository.kt`
 - `app/src/main/java/com/zerodev/smsforwarder/ui/screen/history/HistoryViewModel.kt`
 
-**Result**: Statistics now accurately reflect the actual database counts, with proper handling of both filtered and unfiltered views. Users see correct matched counts regardless of how many pages are loaded. 
+**Result**: Statistics now accurately reflect the actual database counts, with proper handling of both filtered and unfiltered views. Users see correct matched counts regardless of how many pages are loaded.
+
+### Swipe-to-Delete UX Improvement (2024-01-XX)
+
+**Motivation**: Make the delete functionality more intuitive and reduce visual clutter by removing visible delete buttons from each history item.
+
+**Implementation**:
+1. **Swipe Gesture**: Implemented Material Design SwipeToDismiss component
+   - **Direction**: Swipe left (EndToStart) to delete items
+   - **Visual Feedback**: Red background with delete icon appears during swipe
+   - **Animation**: Smooth scale animation for delete icon
+   - **Confirmation**: Item is deleted when swipe reaches threshold
+
+2. **UI Improvements**:
+   - **Cleaner Layout**: Removed delete buttons from history items for cleaner appearance
+   - **User Guidance**: Added helpful hint card showing "Swipe left on any item to delete it"
+   - **Contextual Display**: Hint only shows when no filters are active and history has items
+   - **Consistent Spacing**: Improved layout without delete button spacing
+
+3. **User Experience**:
+   - **Intuitive Interaction**: Swipe gestures feel natural on mobile devices
+   - **Visual Feedback**: Clear indication of delete action with red background
+   - **Error Prevention**: Requires intentional swipe gesture (harder to accidentally trigger)
+   - **Clean Interface**: Less visual clutter with hidden delete functionality
+
+**Technical Details**:
+- Uses Material Design SwipeToDismiss component
+- ExperimentalMaterialApi for swipe functionality
+- Animated background color and icon scale
+- DismissDirection.EndToStart for left swipe
+- Proper state management with confirmStateChange callback
+
+**Files Modified**:
+- `app/src/main/java/com/zerodev/smsforwarder/ui/screen/history/HistoryScreen.kt`
+
+**User Benefits**:
+- **Cleaner UI**: No visible delete buttons cluttering the interface
+- **Mobile-First**: Swipe gestures optimized for touch interactions
+- **Discoverable**: Helpful hint guides users to the functionality
+ - **Consistent**: Follows Material Design patterns for swipe-to-dismiss 
+
+### 2024-01-XX: SwipeToDismiss Compilation Fix
+**Problem**: Material Design 2 SwipeToDismiss components were causing compilation errors with Material 3 setup.
+
+**Solution**: 
+- Removed Material 2 imports: `SwipeToDismiss`, `DismissDirection`, `DismissState`, `DismissValue`, `rememberDismissState`
+- Implemented custom swipe-to-delete using Material 3 compatible components:
+  - `detectHorizontalDragGestures` for gesture detection
+  - `animateFloatAsState` for smooth animations
+  - `IntOffset` for positioning
+  - Custom threshold-based deletion logic
+
+**Technical Details**:
+- Delete threshold: 120dp drag distance
+- Background alpha animation based on drag progress
+- Icon scale animation for visual feedback
+- Drag constraints: maximum 40% of item width
+- Auto-reset on drag end if threshold not met
+
+**Benefits**:
+- Full Material 3 compatibility
+- Smoother animations than Material 2 version
+- Better touch feedback
+- Customizable delete threshold and animations
+
+### Previous Updates
+
+### 2024-01-XX: Statistics Accuracy Fix
+**Problem**: Statistics were calculated from paginated results instead of entire database.
+
+**Solution**: Added filtered count queries to HistoryDao and updated ViewModel to use database-based counting.
+
+### 2024-01-XX: Filter System Implementation
+Implemented comprehensive filtering system:
+- **Search Filter**: Fuzzy search across app names, titles, content, phone numbers
+- **App Filter**: Dropdown with all apps from database
+- **Pattern Filter**: Text input for content pattern matching
+- **Combined Logic**: All filters work together with AND logic
+- **UI Components**: Filter dialog, active filter chips, clear functionality
+
+### 2024-01-XX: Pagination Implementation
+- Changed from loading all history items to paginated loading (15 per page)
+- Improved performance for large datasets
+- Added "Load More" functionality
+- Maintained filter compatibility
+
+### 2024-01-XX: Delete Functionality
+- Initially implemented delete buttons for each history item
+- Later replaced with swipe-to-delete for better UX
+- Added confirmation and visual feedback
+
+## Technical Architecture
+
+### Swipe-to-Delete Implementation
+```kotlin
+// Custom Material 3 compatible swipe gesture
+var offsetX by remember { mutableStateOf(0f) }
+val deleteThreshold = 120.dp.toPx()
+
+detectHorizontalDragGestures(
+    onDragEnd = {
+        if (offsetX < -deleteThreshold) {
+            onDelete()
+        }
+        offsetX = 0f
+    }
+) { _, dragAmount ->
+    val newOffset = offsetX + dragAmount
+    offsetX = newOffset.coerceAtMost(0f).coerceAtLeast(-itemWidth * 0.4f)
+}
+```
+
+### Filter System Architecture
+```kotlin
+// Repository level filtering
+fun getFilteredHistory(
+    limit: Int,
+    offset: Int,
+    searchQuery: String?,
+    selectedApp: String?,
+    patternFilter: String?
+): Flow<List<ForwardingHistory>>
+
+// Combined WHERE clauses for efficient querying
+fun getFilteredCount(...): Flow<Int>
+```
+
+### Database Queries
+- Efficient LIKE queries for text search
+- Index-optimized filtering by app package
+- Proper pagination with LIMIT/OFFSET
+- Accurate count queries for statistics
+
+## Next Steps
+- Performance monitoring for large datasets
+- Additional filter options (date range, status)
+- Export functionality for filtered results
+- Enhanced search with operators (AND, OR, NOT)
