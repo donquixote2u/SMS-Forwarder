@@ -270,6 +270,32 @@ class HistoryRepository @Inject constructor(
             entities.map { entity -> entity.toDomain() }
         }
     }
+    
+    /**
+     * Get statistics with current filters applied.
+     * @param searchQuery Optional search query (empty string if not filtering)
+     * @param appFilter Optional app filter (empty string if not filtering)
+     * @param patternFilter Optional pattern filter (empty string if not filtering)
+     * @return HistoryStatistics object with filtered counts
+     */
+    suspend fun getFilteredStatistics(
+        searchQuery: String,
+        appFilter: String,
+        patternFilter: String
+    ): HistoryStatistics {
+        return if (searchQuery.isEmpty() && appFilter.isEmpty() && patternFilter.isEmpty()) {
+            // No filters, use regular statistics
+            getComprehensiveStatistics()
+        } else {
+            // Filters applied, get filtered counts
+            HistoryStatistics(
+                totalCount = historyDao.getFilteredTotalCount(searchQuery, appFilter, patternFilter),
+                successfulCount = historyDao.getSuccessfulCount(), // These don't change with filters
+                failedCount = historyDao.getFailedCount(),         // as they're global stats
+                matchedCount = historyDao.getFilteredMatchedCount(searchQuery, appFilter, patternFilter)
+            )
+        }
+    }
 }
 
 /**

@@ -43,7 +43,7 @@ class HistoryViewModel @Inject constructor(
     
     init {
         loadFirstPage()
-        loadStatistics()
+        loadFilteredStatistics()
         loadDistinctApps()
     }
     
@@ -77,7 +77,7 @@ class HistoryViewModel @Inject constructor(
      */
     fun refreshHistory() {
         loadFirstPage()
-        loadStatistics()
+        loadFilteredStatistics()
     }
     
     /**
@@ -170,17 +170,45 @@ class HistoryViewModel @Inject constructor(
                         _uiState.value.history + pageHistory
                     }
                     
-                    val matchedCount = currentHistory.count { it.matchedRule }
-                    
                     _uiState.value = _uiState.value.copy(
                         history = currentHistory,
-                        matchedCount = matchedCount,
                         isLoading = false,
                         isLoadingMore = false,
                         hasMorePages = !allHistoryLoaded,
                         error = null
                     )
+                    
+                    // Load statistics after history is loaded
+                    if (currentPage == 0) {
+                        loadFilteredStatistics()
+                    }
                 }
+        }
+    }
+    
+    /**
+     * Load statistics based on current filters.
+     */
+    private fun loadFilteredStatistics() {
+        viewModelScope.launch {
+            try {
+                val stats = historyRepository.getFilteredStatistics(
+                    searchQuery = currentSearchQuery,
+                    appFilter = currentAppFilter,
+                    patternFilter = currentPatternFilter
+                )
+                
+                _uiState.value = _uiState.value.copy(
+                    totalCount = stats.totalCount,
+                    matchedCount = stats.matchedCount,
+                    successCount = stats.successfulCount,
+                    failedCount = stats.failedCount
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Failed to load statistics"
+                )
+            }
         }
     }
     
@@ -218,15 +246,13 @@ class HistoryViewModel @Inject constructor(
                 
                 // Remove from current list
                 val updatedHistory = _uiState.value.history.filter { it.id != historyId }
-                val matchedCount = updatedHistory.count { it.matchedRule }
                 
                 _uiState.value = _uiState.value.copy(
-                    history = updatedHistory,
-                    matchedCount = matchedCount
+                    history = updatedHistory
                 )
                 
                 // Reload statistics
-                loadStatistics()
+                loadFilteredStatistics()
                 
                 // If we have fewer than PAGE_SIZE items and haven't loaded all, load more
                 if (updatedHistory.size < PAGE_SIZE && !allHistoryLoaded) {
@@ -248,37 +274,12 @@ class HistoryViewModel @Inject constructor(
             try {
                 historyRepository.deleteAllHistory()
                 _uiState.value = _uiState.value.copy(
-                    history = emptyList(),
-                    matchedCount = 0
+                    history = emptyList()
                 )
-                loadStatistics()
+                loadFilteredStatistics()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     error = e.message ?: "Failed to clear history"
-                )
-            }
-        }
-    }
-    
-    /**
-     * Load statistics for the history.
-     */
-    private fun loadStatistics() {
-        viewModelScope.launch {
-            try {
-                val stats = historyRepository.getHistoryStatistics()
-                val totalCount = stats.values.sum()
-                val successCount = stats[ForwardingStatus.SUCCESS] ?: 0
-                val failedCount = stats[ForwardingStatus.FAILED] ?: 0
-                
-                _uiState.value = _uiState.value.copy(
-                    totalCount = totalCount,
-                    successCount = successCount,
-                    failedCount = failedCount
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    error = e.message ?: "Failed to load statistics"
                 )
             }
         }

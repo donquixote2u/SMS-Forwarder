@@ -392,4 +392,39 @@ This document tracks the implementation of notification system UI components.
 - Test pagination with large datasets
 - Verify swipe gestures work across different screen sizes
 - Test delete functionality doesn't break statistics
-- Ensure proper error handling for delete operations 
+- Ensure proper error handling for delete operations
+
+### Statistics Accuracy Fix (2024-01-XX)
+
+**Issue**: The "matched" count in statistics was only showing the count from the current page, not the total matched items in the entire history when pagination was implemented.
+
+**Root Cause**: Statistics were being calculated from the paginated results (`uiState.history.count { it.matchedRule }`) instead of querying the entire database.
+
+**Solution**: 
+1. **Database Layer**: Added filtered count queries to `HistoryDao`:
+   - `getFilteredMatchedCount()` - Gets total matched count with current filters
+   - `getFilteredTotalCount()` - Gets total count with current filters
+
+2. **Repository Layer**: Added `getFilteredStatistics()` method that:
+   - Uses regular statistics when no filters are active
+   - Uses filtered statistics when filters are applied
+   - Returns accurate counts for the entire dataset, not just current page
+
+3. **ViewModel Layer**: 
+   - Replaced local counting with database queries
+   - Added `loadFilteredStatistics()` method
+   - Statistics update automatically when filters change
+   - Statistics refresh after delete operations
+
+4. **Statistics Behavior**:
+   - **No Filters**: Shows total statistics for entire history
+   - **With Filters**: Shows statistics for filtered results only
+   - **Matched Count**: Always accurate regardless of pagination
+   - **Total Count**: Reflects filtered results when filters are active
+
+**Files Modified**:
+- `app/src/main/java/com/zerodev/smsforwarder/data/local/dao/HistoryDao.kt`
+- `app/src/main/java/com/zerodev/smsforwarder/data/repository/HistoryRepository.kt`
+- `app/src/main/java/com/zerodev/smsforwarder/ui/screen/history/HistoryViewModel.kt`
+
+**Result**: Statistics now accurately reflect the actual database counts, with proper handling of both filtered and unfiltered views. Users see correct matched counts regardless of how many pages are loaded. 

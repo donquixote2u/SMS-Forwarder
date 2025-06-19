@@ -154,6 +154,63 @@ interface HistoryDao {
     suspend fun getTotalCount(): Int
     
     /**
+     * Get total matched messages count with current filters.
+     * @param searchQuery Optional search query (use empty string if not filtering)
+     * @param appFilter Optional app filter (use empty string if not filtering)  
+     * @param patternFilter Optional pattern filter (use empty string if not filtering)
+     * @return Count of matched messages with filters applied
+     */
+    @Query("""
+        SELECT COUNT(*) FROM forwarding_history 
+        WHERE matched_rule = 1 AND
+              (:searchQuery = '' OR 
+               source_app_name LIKE '%' || :searchQuery || '%' OR
+               source_package LIKE '%' || :searchQuery || '%' OR
+               notification_title LIKE '%' || :searchQuery || '%' OR
+               message_body LIKE '%' || :searchQuery || '%' OR
+               sender_number LIKE '%' || :searchQuery || '%') AND
+              (:appFilter = '' OR 
+               source_package = :appFilter OR source_app_name = :appFilter) AND
+              (:patternFilter = '' OR
+               message_body LIKE '%' || :patternFilter || '%' OR
+               notification_title LIKE '%' || :patternFilter || '%' OR
+               notification_text LIKE '%' || :patternFilter || '%')
+    """)
+    suspend fun getFilteredMatchedCount(
+        searchQuery: String,
+        appFilter: String, 
+        patternFilter: String
+    ): Int
+    
+    /**
+     * Get total count with current filters.
+     * @param searchQuery Optional search query (use empty string if not filtering)
+     * @param appFilter Optional app filter (use empty string if not filtering)  
+     * @param patternFilter Optional pattern filter (use empty string if not filtering)
+     * @return Total count of messages with filters applied
+     */
+    @Query("""
+        SELECT COUNT(*) FROM forwarding_history 
+        WHERE (:searchQuery = '' OR 
+               source_app_name LIKE '%' || :searchQuery || '%' OR
+               source_package LIKE '%' || :searchQuery || '%' OR
+               notification_title LIKE '%' || :searchQuery || '%' OR
+               message_body LIKE '%' || :searchQuery || '%' OR
+               sender_number LIKE '%' || :searchQuery || '%') AND
+              (:appFilter = '' OR 
+               source_package = :appFilter OR source_app_name = :appFilter) AND
+              (:patternFilter = '' OR
+               message_body LIKE '%' || :patternFilter || '%' OR
+               notification_title LIKE '%' || :patternFilter || '%' OR
+               notification_text LIKE '%' || :patternFilter || '%')
+    """)
+    suspend fun getFilteredTotalCount(
+        searchQuery: String,
+        appFilter: String, 
+        patternFilter: String
+    ): Int
+    
+    /**
      * Get history entries with pagination.
      * @param limit Number of items per page
      * @param offset Offset for pagination
