@@ -1,6 +1,7 @@
 # SMS Forwarder Android App
 
 A minimal-UI Android app that monitors SMS and notifications in the background, forwarding matching messages to user-defined HTTP APIs based on customizable rules.
+forked from huukhanh/SMS-Forwarder
 
 ## Features
 
